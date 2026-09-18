@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="暖心小屋">
+  <!-- 配色全部取自页面 :root token：蛋黄酥 #FFD35C / 奶油白 #FFFBF3 / 薄荷 #8FD9C2 / 泡泡粉 #FF9EBB / 暖棕铅笔线 #4B3F35 -->
+  <!-- 蛋黄酥圆角底：保证在浅色/深色标签栏上都看得清 -->
+  <rect x="3" y="3" width="58" height="58" rx="15" fill="#FFD35C" stroke="#4B3F35" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- 屋身：奶油白卡纸 -->
+  <path d="M12 52V32h40v20z" fill="#FFFBF3" stroke="#4B3F35" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- 屋顶：薄荷（压在屋身上沿，形成屋檐线） -->
+  <path d="M32 13l20 19H12z" fill="#8FD9C2" stroke="#4B3F35" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- 屋顶上一道水彩留白（手绘晕染感） -->
+  <path d="M32 17.5l-11 10.5h6.5l9-8.6z" fill="#FFFFFF" opacity=".28"/>
+  <!-- 屋里的一颗心：泡泡粉 -->
+  <path d="M32 46.5 c-4.4 -3.3 -7 -6 -7 -8.9 a4 4 0 0 1 7 -2.5 a4 4 0 0 1 7 2.5 c0 2.9 -2.6 5.6 -7 8.9 z" fill="#FF9EBB"/>
+</svg>

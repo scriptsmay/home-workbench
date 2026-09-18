@@ -1,0 +1,30 @@
+# 托管 home-workbench 静态站的 Caddy 站点块。
+#
+# 该机 Caddyfile 全局块为 `admin off`，因此 **只能 restart，不能 reload**
+# （reload 走 admin API，会被拒绝）。
+#
+# 应用步骤：
+#   1. cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak.$(date +%s%N)
+#   2. 把本文件内容追加到 /etc/caddy/Caddyfile
+#   3. /usr/bin/caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+#   4. systemctl restart caddy
+#
+# 前置条件：
+#   - 域名 A 记录已指向本机（Let's Encrypt http-01 校验需要公网 DNS 可达）
+#   - 域名已备案（国内节点访问与证书签发的硬前提）
+#   - 目标目录已存在（流水线会自动创建，Caddy 需对其有读权限）
+#
+# `profile classic` = Let's Encrypt 生产环境标准 90 天证书。
+# 不可写成裸 `issuer acme`：该机 hermes 托管块带 shortlived 偏好，
+# 裸写会被带偏到 staging（证书不受信任）。
+
+home.virola-eko.com {
+	root * /var/www/html/home
+	file_server
+	encode gzip
+	tls {
+		issuer acme {
+			profile classic
+		}
+	}
+}

@@ -1,0 +1,59 @@
+# .cnb.yml — home-workbench 部署流水线
+#
+# 触发：main 分支 push → 把静态文件同步到国内节点主机，由该机 Caddy 托管。
+#
+# 密钥：目标主机信息与 SSH 私钥全部来自 CNB 密钥仓库，通过 imports 注入为环境变量，
+#       **本仓库不硬编码任何主机地址、路径或凭据**。密钥文件需包含以下字段：
+#         DEPLOY_HOST          目标主机地址
+#         DEPLOY_USER          登录用户
+#         DEPLOY_PATH          静态文件目标目录
+#         DEPLOY_SSH_KEY_B64   SSH 私钥的 base64 编码（单行，规避多行值注入问题）
+#
+# 传输方式：tar over ssh。不依赖 rsync（构建镜像不一定带），tar 与 ssh 是基线工具。
+
+main:
+  push:
+    - name: deploy-static-site
+      imports:
+        - https://cnb.cool/scriptsmay/deploy-secrets/-/blob/main/home-workbench.yml
+      stages:
+        - name: prepare-ssh
+          script: |
+            set -e
+            if ! command -v ssh >/dev/null 2>&1; then
+              echo "构建环境缺少 ssh 客户端，尝试安装..."
+              (apt-get update -qq && apt-get install -y -qq openssh-client) || {
+                echo "openssh-client 安装失败，无法继续"; exit 1; }
+            fi
+            mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+            printf '%s' "$DEPLOY_SSH_KEY_B64" | base64 -d > "$HOME/.ssh/id_deploy"
+            chmod 600 "$HOME/.ssh/id_deploy"
+            ssh-keyscan -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+            echo "SSH 密钥就绪，目标 $DEPLOY_USER@$DEPLOY_HOST"
+
+        - name: sync-files
+          script: |
+            set -e
+            SSH_OPTS="-i $HOME/.ssh/id_deploy -o StrictHostKeyChecking=yes -o ConnectTimeout=20"
+            tar czf - \
+              --exclude=.git \
+              --exclude=.cnb.yml \
+              --exclude=.gitignore \
+              --exclude=deploy \
+              -C . . \
+              | ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" \
+                  "mkdir -p '$DEPLOY_PATH' && tar xzf - -C '$DEPLOY_PATH'"
+            echo "已同步到 $DEPLOY_HOST:$DEPLOY_PATH"
+
+        - name: verify
+          script: |
+            set -e
+            SSH_OPTS="-i $HOME/.ssh/id_deploy -o StrictHostKeyChecking=yes -o ConnectTimeout=20"
+            ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" \
+              "ls -la '$DEPLOY_PATH' && echo '--- 远端 index.html 字节数 ---' && wc -c '$DEPLOY_PATH/index.html'"
+            echo "--- 本地 index.html 字节数 ---"
+            wc -c index.html
+
+      failStages:
+        - name: notify-failure
+          script: echo "静态站部署失败：$CNB_BUILD_FAILED_MSG"

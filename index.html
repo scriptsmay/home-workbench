@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#EEF5E6">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20width%3D%2264%22%20height%3D%2264%22%20role%3D%22img%22%20aria-label%3D%22%E6%9A%96%E5%BF%83%E5%B0%8F%E5%B1%8B%22%3E%20%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2258%22%20height%3D%2258%22%20rx%3D%2215%22%20fill%3D%22%23FFD35C%22%20stroke%3D%22%234B3F35%22%20stroke-width%3D%223.5%22%20stroke-linejoin%3D%22round%22%2F%3E%20%3Cpath%20d%3D%22M12%2052V32h40v20z%22%20fill%3D%22%23FFFBF3%22%20stroke%3D%22%234B3F35%22%20stroke-width%3D%223.5%22%20stroke-linejoin%3D%22round%22%2F%3E%20%3Cpath%20d%3D%22M32%2013l20%2019H12z%22%20fill%3D%22%238FD9C2%22%20stroke%3D%22%234B3F35%22%20stroke-width%3D%223.5%22%20stroke-linejoin%3D%22round%22%2F%3E%20%3Cpath%20d%3D%22M32%2017.5l-11%2010.5h6.5l9-8.6z%22%20fill%3D%22%23FFFFFF%22%20opacity%3D%22.28%22%2F%3E%20%3Cpath%20d%3D%22M32%2046.5%20c-4.4%20-3.3%20-7%20-6%20-7%20-8.9%20a4%204%200%200%201%207%20-2.5%20a4%204%200%200%201%207%202.5%20c0%202.9%20-2.6%205.6%20-7%208.9%20z%22%20fill%3D%22%23FF9EBB%22%2F%3E%20%3C%2Fsvg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20width%3D%2264%22%20height%3D%2264%22%20role%3D%22img%22%20aria-label%3D%22%E6%9A%96%E5%BF%83%E5%B0%8F%E5%B1%8B%22%3E%20%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2258%22%20height%3D%2258%22%20rx%3D%2215%22%20fill%3D%22%23FFD35C%22%20stroke%3D%22%234B3F35%22%20stroke-width%3D%223.5%22%20stroke-linejoin%3D%22round%22%2F%3E%20%3Cpath%20d%3D%22M12%2052V32h40v20z%22%20fill%3D%22%23FFFBF3%22%20stroke%3D%22%234B3F35%22%20stroke-width%3D%223.5%22%20stroke-linejoin%3D%22round%22%2F%3E%20%3Cpath%20d%3D%22M32%2013l20%2019H12z%22%20fill%3D%22%238FD9C2%22%20stroke%3D%22%234B3F35%22%20stroke-width%3D%223.5%22%20stroke-linejoin%3D%22round%22%2F%3E%20%3Cpath%20d%3D%22M32%2017.5l-11%2010.5h6.5l9-8.6z%22%20fill%3D%22%23FFFFFF%22%20opacity%3D%22.28%22%2F%3E%20%3Cpath%20d%3D%22M32%2046.5%20c-4.4%20-3.3%20-7%20-6%20-7%20-8.9%20a4%204%200%200%201%207%20-2.5%20a4%204%200%200%201%207%202.5%20c0%202.9%20-2.6%205.6%20-7%208.9%20z%22%20fill%3D%22%23FF9EBB%22%2F%3E%20%3C%2Fsvg%3E">
+<title>暖心小屋 · 家庭用品工作台</title>
+<!--
+  暖心小屋 · 单文件家庭用品工作台
+  ------------------------------------------------------------------
+  · 零依赖、零构建、零联网：双击即可用，数据全部存在本机浏览器
+  · 4 个页签：今日 / 要买什么 / 家里有啥 / 快过期了，外加一个设置页
+  · 库存两种记法：记数量（抽纸 3 包）或 只记状态（充足/不多了/没了）
+  · 导出：每模块 CSV（带 UTF-8 BOM）/ 全量 CSV / 全量 JSON 备份与还原
+  · 新增页签：在 JS 的 MODULES 表里加一项即可，无需改动其它代码
+  · 电脑（>=768px）左侧导航；手机（<768px）底部四个大按钮
+-->
+<style>
+/* ==========================================================================
+   暖心小屋 · 纸上童话（Cartoon Paper）设计系统
+   1. 画布：淡抹茶格子桌布 + 奶油纸卡
+   2. 线稿：暖棕铅笔线，圆头、有呼吸感
+   3. 颜色：水彩感的低饱和糖果色，边框与阴影都是暖调
+   ========================================================================== */
+:root{
+  /* ---- 纸与布 ---- */
+  --bg-cloth:#EEF5E6;            /* 桌布底色：抹茶青 */
+  --bg-paper:#FFFBF3;            /* 卡纸底色：奶油白 */
+  --bg-paper-2:#FFF6E9;          /* 暖一点的纸 */
+  --bg-cloth-line:rgba(139,178,124,.30);
+  --bg-cloth-line2:rgba(139,178,124,.16);
+  /* ---- 铅笔线条 ---- */
+  --ink:#4B3F35;                 /* 主线条（暖棕，不用纯黑） */
+  --ink-soft:rgba(75,63,53,.16);
+  --ink-line:rgba(75,63,53,.13);
+  --tx-1:#4B3F35;
+  --tx-2:#665748;
+  --tx-3:#7E6C58;
+  /* ---- 水彩糖果色 ---- */
+  --c-coral:#FFA878;             /* 蜜桃橘 */
+  --c-sun:#FFD35C;               /* 蛋黄酥 */
+  --c-butter:#FFEDB8;            /* 淡奶油黄 */
+  --c-mint:#8FD9C2;              /* 薄荷 */
+  --c-leaf:#A4CE7B;              /* 嫩草绿 */
+  --c-grape:#BCA6EA;             /* 葡萄紫 */
+  --c-bubble:#FF9EBB;            /* 泡泡粉 */
+  --c-sky:#9ED1F2;               /* 天空蓝 */
+  --c-clay:#E58C66;              /* 陶土红 */
+  --brand:var(--c-coral);
+  --brand-ink:var(--ink);
+  /* ---- 形状 ---- */
+  --r-card:30px 26px 32px 24px / 26px 32px 24px 30px;   /* 手撕纸边：不规则圆角 */
+  --r-card-alt:26px 32px 24px 30px / 32px 24px 30px 26px;
+  --r-panel:30px 28px 30px 28px / 28px 30px 28px 30px;
+  --r-ctl:16px;
+  --r-pill:999px;
+  --pad-main:34px;
+  --gap-card:20px;
+  /* ---- 字体：圆体优先，自带童趣 ---- */
+  --font-round:"Yuanti SC","圆体-简","STYuanti","Hiragino Maru Gothic ProN",ui-rounded,"SF Pro Rounded","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  --font-num:"Yuanti SC","STYuanti",ui-rounded,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+  --ease-bounce:cubic-bezier(.34,1.56,.64,1);
+  --ease-smooth:cubic-bezier(.4,0,.2,1);
+  /* ---- 贴纸感阴影（暖调、不发灰） ---- */
+  --sh-stick:0 4px 0 rgba(75,63,53,.13), 0 12px 22px rgba(75,63,53,.07);
+  --sh-stick-lg:0 7px 0 rgba(75,63,53,.14), 0 18px 30px rgba(75,63,53,.10);
+  --sh-btn:0 3px 0 rgba(75,63,53,.22);
+  --card-border:2px solid var(--ink);
+  /* 语义状态色（软软的粉彩） */
+  --s-danger-bg:#FFDFD6; --s-danger-ink:#A6412A; --s-danger-line:#F0AC96;
+  --s-warn-bg:#FFEFBF;   --s-warn-ink:#8A5F12;   --s-warn-line:#EBCE83;
+  --s-note-bg:#DCEBFB;   --s-note-ink:#2C5F92;   --s-note-line:#A8C9EA;
+  --s-ok-bg:#DDF3E7;     --s-ok-ink:#2F7355;     --s-ok-line:#9FD7B8;
+  --c-low:#C06440;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background-color:var(--bg-cloth);
+  color:var(--tx-1);
+  font:600 15px/1.72 var(--font-round);
+  -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+  overflow:hidden;
+}
+/* 桌布：十字格子 + 交点小圆点，模仿野餐布 */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-color:var(--bg-cloth);
+  background-image:
+    radial-gradient(circle at 9px 9px, rgba(139,178,124,.36) 1.6px, transparent 2px),
+    repeating-linear-gradient(0deg, var(--bg-cloth-line) 0 1.5px, transparent 1.5px 18px),
+    repeating-linear-gradient(90deg, var(--bg-cloth-line) 0 1.5px, transparent 1.5px 18px),
+    radial-gradient(ellipse at 84% 8%, rgba(255,211,92,.30), transparent 46%),
+    radial-gradient(ellipse at 8% 94%, rgba(158,209,242,.26), transparent 48%);
+  background-size:18px 18px, 18px 18px, 18px 18px, 100% 100%, 100% 100%;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none;-webkit-tap-highlight-color:transparent}
+::selection{background:var(--c-butter);color:var(--ink)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ic{display:block;flex:none}
+/* 线稿加一点点手抖感：圆头、稍粗 */
+svg.ic{stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+/* ========================= 2b. 卡纸上的涂鸦（太阳 / 云 / 小花 / 草叶） ========================= */
+.doodles{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.doodles svg{position:absolute}
+.doodle-sun{top:-34px;left:41%;width:136px;height:136px;animation:sway 9s ease-in-out infinite}
+.doodle-cloud-a{top:20px;left:20%;width:98px;height:50px;opacity:.45;animation:drift 16s ease-in-out infinite}
+.doodle-cloud-b{bottom:16%;right:4%;width:88px;height:46px;opacity:.45;animation:drift 21s ease-in-out infinite reverse}
+.doodle-leaf{bottom:-14px;left:-12px;width:120px;height:104px;opacity:.5}
+.doodle-flower{bottom:-8px;right:24%;width:96px;height:76px;opacity:.5}
+.doodle-stars{top:26%;left:2%;width:96px;height:96px;opacity:.3}
+@keyframes drift{0%,100%{transform:translate(0,0)}50%{transform:translate(14px,-6px)}}
+@keyframes sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+@media(prefers-reduced-motion:reduce){.doodles svg{animation:none!important}}
+/* ========================= 3. 布局：桌布上的两张卡纸 ========================= */
+.app{display:flex;height:100vh;height:100dvh;position:relative;z-index:1;gap:16px;padding:16px}
+.sidebar{
+  width:246px;flex:none;height:100%;display:flex;flex-direction:column;
+  padding:22px 0 16px;border:2px solid var(--ink);border-radius:var(--r-panel);
+  background:var(--bg-paper);position:relative;box-shadow:var(--sh-stick);
+}
+/* 侧栏纸面上的横向格线，像一页手账纸 */
+.sidebar::after{
+  content:"";position:absolute;inset:auto 12px 12px;top:96px;pointer-events:none;
+  background-image:repeating-linear-gradient(180deg,var(--ink-line) 0 1px,transparent 1px 34px);
+  opacity:.55;
+}
+.brand{padding:0 20px 18px;display:flex;align-items:center;gap:12px}
+.brand .dot{
+  width:42px;height:42px;flex:none;display:grid;place-items:center;
+  border-radius:26px 22px 26px 22px / 22px 26px 22px 26px;
+  background:var(--c-butter);border:2px solid var(--ink);box-shadow:0 3px 0 rgba(75,63,53,.2);
+}
+.brand h1{font-size:19px;font-weight:800;letter-spacing:.04em;line-height:1.2}
+.brand .sub{font-size:11px;font-weight:700;color:var(--tx-3);letter-spacing:.06em;margin-top:2px}
+.nav{flex:1;overflow-y:auto;padding:6px 14px;display:flex;flex-direction:column;gap:8px}
+.nav::-webkit-scrollbar{width:0}
+.tab{
+  display:flex;align-items:center;gap:12px;min-height:52px;padding:0 15px;
+  border-radius:20px 24px 20px 24px / 24px 20px 24px 20px;
+  border:2px solid transparent;
+  color:var(--tx-2);font-size:15px;font-weight:800;text-align:left;width:100%;
+  transition:transform .2s var(--ease-bounce),background .2s var(--ease-smooth),box-shadow .2s,color .2s;
+}
+.tab:hover{background:var(--bg-paper-2);transform:translateX(2px)}
+.tab.active{
+  background:var(--c-butter);color:var(--ink);border-color:var(--ink);
+  box-shadow:0 3px 0 rgba(75,63,53,.22);transform:translateX(3px) rotate(-.6deg);
+}
+.tab .glyph{
+  width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.7);border:2px solid transparent;transition:all .2s var(--ease-bounce);
+}
+.tab.active .glyph{background:var(--c-sun);border-color:var(--ink)}
+.side-foot{margin-top:12px;padding:14px 14px 0;border-top:2px dashed var(--ink-line)}
+.main{
+  flex:1;min-width:0;display:flex;flex-direction:column;position:relative;overflow:hidden;
+  border:2px solid var(--ink);border-radius:var(--r-panel);background:var(--bg-paper);
+  box-shadow:var(--sh-stick);
+}
+.main>*{position:relative;z-index:1}
+.topbar{
+  padding:26px var(--pad-main) 12px;display:flex;align-items:flex-end;
+  justify-content:space-between;gap:14px;flex:none;
+}
+.topbar h2{
+  font-size:28px;font-weight:800;line-height:1.2;letter-spacing:.03em;position:relative;display:inline-block;
+}
+/* 标题下方的蜡笔波浪线 */
+.topbar h2::after{
+  content:"";position:absolute;left:2px;right:6px;bottom:-7px;height:7px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 8' preserveAspectRatio='none'%3E%3Cpath d='M0 5 C 10 1, 20 8, 30 4 S 50 1, 60 5 S 80 8, 90 4 S 110 1, 120 5' fill='none' stroke='%23FFA878' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size:120px 8px;background-repeat:repeat-x;
+}
+.topbar .sub{font-size:12.5px;font-weight:700;color:var(--tx-3);margin-top:12px}
+.tb-left{min-width:0;padding-bottom:6px}
+.tb-right{display:flex;align-items:center;gap:10px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.topbar .settings-mobile{display:none}
+.iconbtn.on{background:var(--c-butter)}
+.view{flex:1;overflow-y:auto;padding:10px var(--pad-main) 44px;overscroll-behavior:contain}
+.view::-webkit-scrollbar{width:8px}
+.view::-webkit-scrollbar-thumb{background:var(--ink-line);border-radius:99px}
+.view-inner{animation:pop .34s var(--ease-bounce)}
+@keyframes pop{from{opacity:0;transform:scale(.985) translateY(8px)}to{opacity:1;transform:none}}
+.tabbar{display:none}
+/* ========================= 4. 卡片 ========================= */
+.card{
+  position:relative;background:var(--bg-paper);border:var(--card-border);border-radius:var(--r-card);
+  padding:22px 22px 20px;box-shadow:var(--sh-stick);
+  transition:transform .24s var(--ease-bounce),box-shadow .24s var(--ease-smooth);
+}
+.card+.card{margin-top:var(--gap-card)}
+/* 每张卡左上角的「贴纸胶带」，让纸卡像被贴在相册里 */
+.card::before{
+  content:"";position:absolute;top:-9px;left:26px;width:64px;height:18px;
+  background-image:linear-gradient(45deg,var(--c-butter) 25%,transparent 25%,transparent 50%,var(--c-butter) 50%,var(--c-butter) 75%,transparent 75%);
+  background-size:8px 8px;background-color:rgba(255,237,184,.85);
+  border:2px solid var(--ink);border-radius:4px;transform:rotate(-3deg);
+  box-shadow:0 2px 0 rgba(75,63,53,.12);
+}
+.card:nth-of-type(even)::before{left:auto;right:26px;transform:rotate(3deg);background-color:rgba(158,209,242,.6)}
+.card h3{font-size:15.5px;font-weight:800;letter-spacing:.03em;margin-bottom:14px;display:flex;align-items:center;gap:8px;justify-content:space-between}
+.card h3 .h-l{display:flex;align-items:center;gap:8px}
+.card h3 .h-l svg{color:var(--ink)}
+.card h3 .count{font-size:12px;font-weight:800;color:var(--tx-3)}
+.hint{font-size:12.5px;font-weight:700;color:var(--tx-3);line-height:1.7}
+.divider{height:0;border-top:2px dashed var(--ink-line);margin:16px 0}
+/* ========================= 5. 按钮 ========================= */
+.btn{
+  min-height:46px;padding:0 22px;border-radius:var(--r-pill);
+  border:2px solid var(--ink);background:var(--bg-paper);color:var(--ink);
+  font-size:14px;font-weight:800;display:inline-flex;align-items:center;gap:8px;justify-content:center;
+  box-shadow:var(--sh-btn);
+  transition:transform .18s var(--ease-bounce),box-shadow .18s var(--ease-smooth),background .18s;
+}
+.btn:hover{transform:translateY(-3px) rotate(-1deg);box-shadow:0 6px 0 rgba(75,63,53,.22)}
+.btn:active{transform:translateY(1px) rotate(0);box-shadow:0 1px 0 rgba(75,63,53,.22)}
+.btn.primary{background:var(--c-sun)}
+.btn.mint{background:var(--c-mint)}
+.btn.sun{background:var(--c-butter)}
+.btn.ghost{box-shadow:none;border-style:dashed;background:transparent}
+.btn.sm{min-height:40px;padding:0 16px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.iconbtn{
+  width:46px;height:46px;flex:none;display:grid;place-items:center;border-radius:var(--r-pill);
+  border:2px solid var(--ink);background:var(--bg-paper);box-shadow:var(--sh-btn);
+  transition:transform .18s var(--ease-bounce),box-shadow .18s,background .18s;
+}
+.iconbtn:hover{transform:translateY(-2px) rotate(-3deg);box-shadow:0 5px 0 rgba(75,63,53,.22)}
+.iconbtn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(75,63,53,.22)}
+.iconbtn.plain{width:40px;height:40px;box-shadow:none;border-color:transparent;background:transparent;color:var(--tx-3)}
+.iconbtn.plain:hover{background:var(--bg-paper-2);color:var(--ink);border-color:var(--ink-line)}
+/* ========================= 6. 表单 ========================= */
+.field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.field>span{font-size:12px;font-weight:800;color:var(--tx-2);letter-spacing:.04em}
+.field input,.field select,.field textarea{
+  width:100%;min-height:48px;padding:11px 15px;font-size:16px;font-weight:700;
+  background:#FFFDF8;border:2px solid var(--ink);border-radius:var(--r-ctl);
+  outline:none;transition:border-color .16s,box-shadow .16s,background .16s;
+}
+.field textarea{min-height:78px;resize:vertical;line-height:1.7}
+.field input:focus,.field select:focus,.field textarea:focus{
+  border-color:var(--c-clay);background:#FFFEF9;box-shadow:0 0 0 4px rgba(255,211,92,.35);
+}
+.field input::placeholder,.field textarea::placeholder{color:var(--tx-3);font-weight:600}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;align-items:end}
+.form-grid .wide{grid-column:1/-1}
+.field-note{font-size:11.5px;font-weight:700;color:var(--tx-3);margin-top:8px;line-height:1.6}
+.grid{display:grid;gap:var(--gap-card)}
+/* ========================= 7. 数字磁贴 ========================= */
+.tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:var(--gap-card)}
+.tile{
+  position:relative;overflow:hidden;text-align:left;background:var(--bg-paper);
+  border:var(--card-border);border-radius:var(--r-card-alt);
+  padding:16px 18px 15px;box-shadow:var(--sh-stick);
+  transition:transform .22s var(--ease-bounce),box-shadow .22s;
+}
+.tile:hover{transform:translateY(-4px) rotate(-1.2deg);box-shadow:var(--sh-stick-lg)}
+.tile:active{transform:translateY(1px)}
+.tile::after{
+  content:"";position:absolute;right:-18px;bottom:-22px;width:76px;height:76px;border-radius:50%;
+  background:var(--c-butter);opacity:.55;
+}
+.tile:nth-child(1)::after{background:var(--c-butter)}
+.tile:nth-child(2)::after{background:var(--c-mint)}
+.tile:nth-child(3)::after{background:var(--c-bubble)}
+.tile .tk{font-size:12px;font-weight:800;color:var(--tx-2);display:flex;align-items:center;gap:6px;position:relative;z-index:1}
+.tile .tv{font-size:34px;font-weight:800;line-height:1.1;font-family:var(--font-num);margin-top:8px;font-variant-numeric:tabular-nums;position:relative;z-index:1}
+.tile .tv .u{font-size:13px;font-family:var(--font-round);margin-left:4px;color:var(--tx-2)}
+.tile.warn .tv{color:var(--c-low)}
+.tile.ok .tv{color:var(--s-ok-ink)}
+.tile .cap{font-size:12px;font-weight:700;color:var(--tx-3);margin-top:3px;position:relative;z-index:1}
+/* ========================= 8. 徽章 / 筛选豆 ========================= */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 12px;border-radius:var(--r-pill);
+  font-size:11.5px;font-weight:800;white-space:nowrap;border:1.5px solid transparent;
+}
+.b-danger{background:var(--s-danger-bg);color:var(--s-danger-ink);border-color:var(--s-danger-line)}
+.b-warn{background:var(--s-warn-bg);color:var(--s-warn-ink);border-color:var(--s-warn-line)}
+.b-note{background:var(--s-note-bg);color:var(--s-note-ink);border-color:var(--s-note-line)}
+.b-ok{background:var(--s-ok-bg);color:var(--s-ok-ink);border-color:var(--s-ok-line)}
+.b-plain{background:#F4F1EA;color:var(--tx-2);border-color:var(--ink-line)}
+.chips{display:flex;gap:9px;flex-wrap:wrap}
+.chip{
+  min-height:40px;padding:0 16px;border-radius:var(--r-pill);border:2px solid var(--ink);
+  background:var(--bg-paper);font-size:13px;font-weight:800;color:var(--tx-2);
+  display:inline-flex;align-items:center;gap:6px;
+  box-shadow:0 2px 0 rgba(75,63,53,.16);
+  transition:all .18s var(--ease-bounce);
+}
+.chip:hover{transform:translateY(-2px)}
+.chip.on{background:var(--c-mint);color:var(--ink);box-shadow:0 3px 0 rgba(75,63,53,.22)}
+.chip:active{transform:translateY(1px)}
+/* ========================= 9. 行列表 ========================= */
+.rows{display:flex;flex-direction:column;gap:11px}
+.row{
+  position:relative;display:flex;align-items:center;gap:12px;padding:13px 15px;
+  border:2px solid var(--ink-line);border-radius:var(--r-ctl);background:#FFFDF8;
+  transition:border-color .18s,transform .18s var(--ease-bounce),background .18s;
+}
+.row:hover{border-color:var(--ink-soft);transform:translateX(2px)}
+.row .grow{flex:1;min-width:0}
+.row .n{font-size:15px;font-weight:800;line-height:1.4;word-break:break-word}
+.row .m{font-size:12.5px;font-weight:700;color:var(--tx-3);margin-top:2px}
+.row.done{background:#F7F5EF}
+.row.done .n{text-decoration:line-through;color:var(--tx-3)}
+.check{
+  width:46px;height:46px;flex:none;border-radius:var(--r-pill);border:2px solid var(--ink);
+  background:var(--bg-paper);box-shadow:0 3px 0 rgba(75,63,53,.2);display:grid;place-items:center;color:var(--tx-3);
+  transition:all .2s var(--ease-bounce);
+}
+.check:hover{color:var(--s-ok-ink);background:var(--s-ok-bg);transform:translateY(-3px) rotate(-6deg);box-shadow:0 5px 0 rgba(75,63,53,.2)}
+.check:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(75,63,53,.2)}
+.group-head{
+  font-size:12.5px;font-weight:800;color:var(--tx-2);letter-spacing:.05em;
+  display:flex;align-items:center;gap:10px;margin:18px 0 10px;
+}
+.group-head:first-child{margin-top:0}
+.group-head .line{flex:1;height:0;border-top:2px dotted var(--ink-soft)}
+/* ========================= 10. 库存物品卡 ========================= */
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:15px}
+.item{
+  position:relative;border:2px solid var(--ink);border-radius:var(--r-card);background:var(--bg-paper);
+  padding:16px 17px;box-shadow:var(--sh-stick);
+  display:flex;flex-direction:column;gap:11px;overflow:hidden;
+  transition:transform .22s var(--ease-bounce),box-shadow .22s;
+}
+.item::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:7px;background:var(--c-mint);
+  border-right:2px solid var(--ink);
+}
+.item:nth-child(3n)::before{background:var(--c-butter)}
+.item:nth-child(3n+1)::before{background:var(--c-bubble)}
+.item:hover{transform:translateY(-4px) rotate(-.8deg);box-shadow:var(--sh-stick-lg)}
+.item.low{border-color:var(--c-low);box-shadow:0 4px 0 rgba(192,100,64,.3)}
+.item.low::before{background:var(--c-coral)}
+.item-top{display:flex;align-items:flex-start;gap:8px}
+.item-name{flex:1;font-size:16px;font-weight:800;line-height:1.4;word-break:break-word}
+.item-meta{font-size:12px;font-weight:700;color:var(--tx-3);display:flex;flex-wrap:wrap;gap:4px 10px}
+.item-qty{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stepper{display:flex;align-items:center;gap:10px}
+.step-btn{
+  width:44px;height:44px;border-radius:var(--r-pill);border:2px solid var(--ink);
+  background:var(--bg-paper-2);display:grid;place-items:center;
+  box-shadow:0 3px 0 rgba(75,63,53,.2);transition:transform .18s var(--ease-bounce),box-shadow .18s,background .18s;
+}
+.step-btn:hover{background:var(--c-butter);transform:translateY(-2px);box-shadow:0 5px 0 rgba(75,63,53,.2)}
+.step-btn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(75,63,53,.2)}
+.qty{font-size:26px;font-weight:800;font-family:var(--font-num);min-width:46px;text-align:center;font-variant-numeric:tabular-nums}
+.qty .u{font-size:12px;font-family:var(--font-round);color:var(--tx-2);margin-left:3px}
+.levels{display:flex;gap:7px;flex-wrap:wrap}
+.lv{
+  min-height:40px;padding:0 14px;border-radius:var(--r-pill);border:2px solid var(--ink-line);
+  background:var(--bg-paper);font-size:12.5px;font-weight:800;color:var(--tx-2);transition:all .18s var(--ease-bounce);
+}
+.lv:hover{transform:translateY(-2px);border-color:var(--ink-soft)}
+.lv.on{background:var(--c-mint);border-color:var(--ink);color:var(--ink);box-shadow:0 3px 0 rgba(75,63,53,.2)}
+.lv.on.danger{background:var(--s-danger-bg);color:var(--s-danger-ink)}
+.item-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto}
+.item-acts{display:flex;gap:6px}
+/* ========================= 11. 空状态 / 快速输入 / 英雄区 ========================= */
+.empty{padding:38px 18px 34px;text-align:center}
+.empty .big{
+  width:88px;height:88px;margin:0 auto 16px;border-radius:44% 56% 46% 54% / 54% 46% 56% 44%;
+  background:var(--bg-paper-2);border:2px solid var(--ink);display:grid;place-items:center;color:var(--ink);
+  box-shadow:0 4px 0 rgba(75,63,53,.14);animation:sway 6s ease-in-out infinite;
+}
+.empty .et{font-size:15.5px;font-weight:800;color:var(--tx-1)}
+.empty .es{font-size:12.5px;font-weight:700;color:var(--tx-3);margin-top:6px;line-height:1.7}
+.empty .btn{margin-top:18px}
+.quick{display:flex;gap:11px;align-items:stretch;flex-wrap:wrap}
+.quick input{
+  flex:1;min-width:180px;min-height:52px;padding:0 18px;font-size:16px;font-weight:700;
+  background:#FFFDF8;border:2px solid var(--ink);border-radius:var(--r-pill);outline:none;
+  transition:box-shadow .18s,border-color .18s;
+}
+.quick input:focus{box-shadow:0 0 0 4px rgba(255,211,92,.4);border-color:var(--c-clay)}
+.quick input::placeholder{color:var(--tx-3)}
+.hero{
+  position:relative;overflow:hidden;border:var(--card-border);border-radius:var(--r-panel);
+  background:linear-gradient(180deg,#FFF6E4,#FFFBF3);
+  padding:20px 22px;margin-bottom:var(--gap-card);box-shadow:var(--sh-stick);
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.hero::after{
+  content:"";position:absolute;right:-30px;bottom:-46px;width:132px;height:132px;border-radius:50%;
+  background:var(--c-butter);opacity:.7;
+}
+.hero .face{
+  width:56px;height:56px;flex:none;border-radius:50% 46% 52% 48% / 48% 52% 46% 50%;
+  background:var(--c-sun);border:2px solid var(--ink);box-shadow:0 3px 0 rgba(75,63,53,.2);
+  display:grid;place-items:center;font-size:22px;position:relative;z-index:1;
+}
+.hero .ht{font-size:16px;font-weight:800;line-height:1.6;position:relative;z-index:1}
+.hero .hs{font-size:12.5px;font-weight:700;color:var(--tx-2);margin-top:4px;line-height:1.7;position:relative;z-index:1}
+.signature{
+  text-align:center;padding:26px 0 8px;
+  font-size:11px;font-weight:700;letter-spacing:.2em;text-indent:.1em;
+  color:var(--tx-3);
+}
+.stat-line{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0}
+.stat-line+.stat-line{border-top:2px dotted var(--ink-line)}
+.stat-line .k{font-size:13.5px;font-weight:700;color:var(--tx-2)}
+.stat-line .v{font-size:19px;font-weight:800;font-family:var(--font-num);font-variant-numeric:tabular-nums}
+/* ========================= 12. 弹层与吐司 ========================= */
+.modal[hidden]{display:none}
+.modal{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.modal-scrim{position:absolute;inset:0;background:rgba(75,63,53,.4);backdrop-filter:blur(2px)}
+.modal-panel{
+  position:relative;width:100%;max-width:540px;max-height:88vh;overflow-y:auto;
+  background:var(--bg-paper);border:2px solid var(--ink);
+  border-radius:32px 32px 0 0;
+  padding:22px 22px calc(22px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 0 rgba(75,63,53,.08);
+  animation:slideUp .34s var(--ease-bounce);
+}
+.modal-panel::before{
+  content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%);
+  width:52px;height:6px;border-radius:99px;background:var(--ink-line);
+}
+@keyframes slideUp{from{transform:translateY(28px);opacity:0}to{transform:none;opacity:1}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 16px}
+.modal-head h3{font-size:18px;font-weight:800}
+.modal-foot{display:flex;gap:11px;flex-wrap:wrap;margin-top:18px}
+.modal-foot .btn{flex:1;min-width:130px}
+.modal-sub{font-size:12.5px;font-weight:700;color:var(--tx-3);margin:-6px 0 14px;line-height:1.7}
+.toast{
+  position:fixed;left:50%;bottom:30px;transform:translate(-50%,20px);
+  background:var(--ink);color:#FFFBF3;border-radius:var(--r-pill);
+  padding:13px 24px;font-size:13.5px;font-weight:800;opacity:0;pointer-events:none;z-index:95;
+  transition:all .32s var(--ease-bounce);max-width:86vw;text-align:center;
+  box-shadow:0 6px 18px rgba(75,63,53,.24);
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+/* ========================= 13. 覆盖与修正 ========================= */
+/* 涂鸦层：绝对定位铺满卡纸，永远压在内容下方（不干扰点击与阅读） */
+.main>*:not(.doodles){position:relative;z-index:1}
+.doodles{position:absolute;inset:0;height:auto;z-index:0}
+/* 桌面端隐藏下拉把手（抽屉只属于手机） */
+@media(min-width:768px){.modal-panel::before{display:none}}
+/* 卡纸标题的小图标 = 一颗彩色圆扣 */
+.card h3 .h-l svg{
+  width:17px;height:17px;padding:5px;box-sizing:content-box;border-radius:50%;
+  border:2px solid var(--ink);background:var(--c-butter);
+}
+.card:nth-of-type(3n+2) h3 .h-l svg{background:var(--c-mint)}
+.card:nth-of-type(3n) h3 .h-l svg{background:var(--c-sky)}
+.card:nth-of-type(4n) h3 .h-l svg{background:var(--c-bubble)}
+/* 内容区留一点呼吸，别贴着卡纸边 */
+.view-inner{padding-bottom:6px}
+@media(max-width:767px){
+  .card h3 .h-l svg{width:15px;height:15px;padding:4px}
+}
+/* ========================= 14. 响应式 ========================= */
+@media(max-width:1279px){:root{--pad-main:26px}}
+@media(max-width:1023px){
+  .app{gap:10px;padding:10px}
+  .sidebar{width:78px;padding-top:20px}
+  .brand{justify-content:center;padding:0 0 16px}
+  .brand h1,.brand .sub,.tab .label,.side-foot .label{display:none}
+  .tab{justify-content:center;padding:0}
+  .nav{padding:0 10px}
+  .doodle-flower{display:none}
+}
+@media(max-width:767px){
+  :root{--pad-main:15px;--gap-card:15px}
+  body{font-size:15px}
+  /* 手机顶栏拥挤，只留一朵云当装饰 */
+  .doodle-sun{display:none}
+  .doodle-cloud-a{left:46%;top:4px;width:76px;height:40px;opacity:.45}
+  .doodle-stars{display:none}
+  .app{gap:0;padding:8px 8px 0}
+  .sidebar{display:none}
+  .topbar{padding:20px var(--pad-main) 10px;align-items:center}
+  .topbar h2{font-size:22px}
+  .topbar .sub{display:none}
+  .actions{flex-wrap:nowrap}
+  .settings-mobile{display:grid}
+  .topbar .settings-mobile{display:grid}
+  .view{padding-bottom:24px}
+  .tiles{grid-template-columns:repeat(3,1fr);gap:11px}
+  .tile{padding:13px 12px;border-radius:20px 22px 20px 22px / 22px 20px 22px 20px}
+  .tile .tk{font-size:11px}
+  .tile .tv{font-size:25px}
+  .tile .cap{display:none}
+  .items{grid-template-columns:1fr}
+  .card{padding:18px 16px 16px}
+  .modal-panel{max-height:92vh}
+  .modal{align-items:flex-end}
+  .tabbar{
+    display:flex;flex:none;position:relative;z-index:60;
+    background:var(--bg-paper);border-top:2px dashed var(--ink-line);
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+  }
+  .tabbar button{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    min-height:58px;border-radius:var(--r-ctl);color:var(--tx-3);
+    font-size:11.5px;font-weight:800;transition:all .18s var(--ease-bounce);
+  }
+  .tabbar button.active{color:var(--ink)}
+  .tabbar button.active .glyph{
+    background:var(--c-sun);border-color:var(--ink);box-shadow:0 2px 0 rgba(75,63,53,.22);color:var(--ink);
+    transform:translateY(-2px) rotate(-6deg);
+  }
+  .tabbar .glyph{
+    width:38px;height:32px;border-radius:var(--r-pill);display:grid;place-items:center;
+    border:2px solid transparent;transition:all .2s var(--ease-bounce);
+  }
+}
+@media(min-width:768px){
+  .modal{align-items:center}
+  .modal-panel{border-radius:32px;margin:0 16px;box-shadow:0 14px 40px rgba(75,63,53,.2)}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot">
+        <svg viewBox="0 0 32 32" width="24" height="24" fill="none" stroke="#4B3F35" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 15.5 16 8l9 7.5" fill="#FFA878"/>
+          <path d="M9.5 15v10h13V15" fill="#FFFBF3"/>
+          <rect x="13.6" y="19" width="4.8" height="6.2" rx="1" fill="#FFD35C"/>
+        </svg>
+      </div>
+      <div>
+        <h1 id="brandTitle">暖心小屋</h1>
+        <div class="sub" id="brandSub">细水长流，岁岁年年</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <button class="tab" data-goto="__settings">
+        <span class="glyph" data-icon="settings"></span><span class="label">设置 · 导出</span>
+      </button>
+    </div>
+  </aside>
+  <main class="main">
+    <!-- 卡纸上的手绘涂鸦（纯装饰，不参与交互） -->
+    <div class="doodles" aria-hidden="true">
+      <!-- 太阳： rays + 笑脸 -->
+      <svg class="doodle-sun" viewBox="0 0 140 140" fill="none">
+        <g stroke="#4B3F35" stroke-width="2.6" stroke-linecap="round">
+          <circle cx="68" cy="66" r="34" fill="#FFD35C"/>
+          <path d="M68 14v12M68 106v12M14 66h12M110 66h12M30 28l9 9M97 95l9 9M106 28l-9 9M39 95l-9 9"/>
+        </g>
+        <g fill="#4B3F35"><circle cx="58" cy="62" r="3.4"/><circle cx="79" cy="62" r="3.4"/></g>
+        <path d="M56 78c4 5 20 5 24 0" stroke="#4B3F35" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <circle cx="46" cy="76" r="5" fill="#FFA878" opacity=".75"/>
+        <circle cx="91" cy="76" r="5" fill="#FFA878" opacity=".75"/>
+      </svg>
+      <!-- 云 -->
+      <svg class="doodle-cloud-a" viewBox="0 0 120 62" fill="none">
+        <path d="M24 52c-11 0-19-7-19-16S13 20 24 20c2-11 11-18 21-18 9 0 17 5 21 12 3-3 7-5 12-5 10 0 18 8 18 18 0 1 0 2-.3 3 6 2 10 7 10 12 0 8-7 14-17 14z"
+              fill="#FFFFFF" stroke="#4B3F35" stroke-width="2.4" stroke-linejoin="round"/>
+      </svg>
+      <svg class="doodle-cloud-b" viewBox="0 0 120 62" fill="none">
+        <path d="M24 52c-11 0-19-7-19-16S13 20 24 20c2-11 11-18 21-18 9 0 17 5 21 12 3-3 7-5 12-5 10 0 18 8 18 18 0 1 0 2-.3 3 6 2 10 7 10 12 0 8-7 14-17 14z"
+              fill="#EDF6FF" stroke="#4B3F35" stroke-width="2.4" stroke-linejoin="round"/>
+      </svg>
+      <!-- 草叶 -->
+      <svg class="doodle-leaf" viewBox="0 0 130 120" fill="none">
+        <g stroke="#4B3F35" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 116C12 74 28 44 58 30" fill="#A4CE7B"/>
+          <path d="M58 30c4-18 20-28 34-24 12 4 16 18 10 30-8 16-28 14-44-6z" fill="#8FD9C2"/>
+          <path d="M26 114c-4-24 4-44 20-56" fill="none"/>
+          <path d="M70 106c2-20 14-34 30-38" fill="#FFD35C" opacity=".9"/>
+        </g>
+      </svg>
+      <!-- 小花 -->
+      <svg class="doodle-flower" viewBox="0 0 120 90" fill="none">
+        <g stroke="#4B3F35" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M24 86c0-18 2-32 6-42" fill="none"/>
+          <circle cx="30" cy="34" r="13" fill="#FF9EBB"/>
+          <circle cx="30" cy="34" r="4.5" fill="#FFD35C"/>
+          <path d="M64 86c0-14 1-26 4-34" fill="none"/>
+          <circle cx="68" cy="42" r="11" fill="#FFD35C"/>
+          <circle cx="68" cy="42" r="4" fill="#E58C66"/>
+          <path d="M96 86c0-12 1-22 3-28" fill="none"/>
+          <circle cx="99" cy="50" r="9" fill="#BCA6EA"/>
+          <circle cx="99" cy="50" r="3.4" fill="#FFEDB8"/>
+        </g>
+      </svg>
+      <!-- 星星点点 -->
+      <svg class="doodle-stars" viewBox="0 0 120 120" fill="none">
+        <g stroke="#4B3F35" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 34l4 11 11 4-11 4-4 11-4-11-11-4 11-4z" fill="#FFEDB8"/>
+          <path d="M76 20l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#FF9EBB"/>
+          <path d="M52 74l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#9ED1F2"/>
+        </g>
+      </svg>
+    </div>
+    <header class="topbar">
+      <div class="tb-left">
+        <h2 id="pageTitle">今日</h2>
+        <div class="sub" id="pageSub"></div>
+      </div>
+      <div class="tb-right">
+        <div class="actions" id="pageActions"></div>
+        <button class="iconbtn settings-mobile" id="settingsBtn" data-goto="__settings" aria-label="设置"></button>
+      </div>
+    </header>
+    <section class="view" id="viewEl"><div class="view-inner" id="viewRoot"></div></section>
+    <nav class="tabbar" id="tabbar"></nav>
+  </main>
+</div>
+<div class="modal" id="modal" hidden>
+  <div class="modal-scrim" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h3 id="modalTitle">标题</h3>
+      <button class="iconbtn" data-close aria-label="关闭" id="modalCloseBtn"></button>
+    </div>
+    <div class="modal-sub" id="modalSub"></div>
+    <div id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+/* ==================================================================
+   1. 图标（圆头线框，stroke 2.25，随文字颜色）
+   ================================================================== */
+const ICONS = {
+  today:   '<path d="M4 11.2 12 4.6l8 6.6"/><path d="M6.6 9.9V19h10.8V9.9"/><path d="M10.5 19v-4.4h3V19"/>',
+  wants:   '<path d="M6.6 7.6h10.8l1 11.9H5.6z"/><path d="M9.4 7.6V6.3a2.6 2.6 0 0 1 5.2 0v1.3"/>',
+  stock:   '<rect x="4" y="7.4" width="16" height="12.2" rx="2.6"/><path d="M4 12.4h16"/><path d="M10 10.4h4"/>',
+  expire:  '<circle cx="12" cy="12" r="7.8"/><path d="M12 7.6V12l3.2 2"/>',
+  settings:'<path d="M4 7.5h8.4M17.4 7.5H20M4 16.5h2.6M11.6 16.5H20"/><circle cx="15" cy="7.5" r="2.4"/><circle cx="9.2" cy="16.5" r="2.4"/>',
+  plus:    '<path d="M12 6v12M6 12h12"/>',
+  minus:   '<path d="M6 12h12"/>',
+  check:   '<path d="M5 12.6 9.4 17 19 7.2"/>',
+  close:   '<path d="M7 7l10 10M17 7 7 17"/>',
+  edit:    '<path d="M5.5 18.5h3.6L19 8.6 15.4 5 5.5 14.9z"/><path d="M13.8 6.6 17.4 10.2"/>',
+  cart:    '<circle cx="9.2" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/><path d="M3.5 4.5h2.3l2.4 9.6h9.6l2-7H6.5"/>',
+  trash:   '<path d="M5 7.4h14"/><path d="M9.4 7.4V5.5h5.2v1.9"/><path d="M7 7.4 8 19.4h8l1-12"/>',
+  undo:    '<path d="M4.6 9.4h9.2a4.6 4.6 0 1 1 0 9.2H8.6"/><path d="M8.2 5.4 4 9.4l4.2 4"/>',
+  cal:     '<rect x="4" y="6.4" width="16" height="13.6" rx="2.6"/><path d="M4 10.6h16M8.6 4.4v3.6M15.4 4.4v3.6"/>',
+  spark:   '<path d="M12 4.5l1.7 4.6 4.6 1.7-4.6 1.7L12 17.1l-1.7-4.6L5.7 10.8l4.6-1.7z"/>'
+};
+function icon(name,size){
+  const s = size||20;
+  return '<svg class="ic" viewBox="0 0 24 24" width="'+s+'" height="'+s+'" fill="none" '+
+    'stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+    (ICONS[name]||'')+'</svg>';
+}
+/* ==================================================================
+   2. 模块定义表（新增页签只改这里）
+   ================================================================== */
+const MODULES = [
+  { id:'today',  name:'今日',     glyph:'today',  sub:'家里今天要办的事' },
+  { id:'wants',  name:'要买什么', glyph:'wants',  sub:'想买的、家人要的，先记下来' },
+  { id:'stock',  name:'家里有啥', glyph:'stock',  sub:'库存台账与买回记录' },
+  { id:'expire', name:'快过期了', glyph:'expire', sub:'按到期日分档，该用就用该扔就扔' }
+];
+/* ==================================================================
+   3. 数据层（唯一出口，业务代码里不出现裸 localStorage）
+   ================================================================== */
+const DEFAULTS = {
+  schemaVersion: 1,
+  tab: 'today',
+  shopName: '暖心小屋',
+  tagline: '细水长流，岁岁年年',
+  members: ['全家','我','老公','孩子','爸妈','宠物'],
+  cats: ['食品','零食','日用','清洁','洗护','纸品','药品','其他'],
+  places: ['厨房','冰箱','卫生间','阳台','储物间','卧室','客厅'],
+  freshDays: 7,
+  soonDays: 30,
+  items: [],
+  wants: [],
+  logs: [],
+  ui: { stockFilter:'all', stockCat:'', stockPlace:'', stockQ:'', wantsDone:false, stockSub:'items' }
+};
+const STORAGE_KEY = 'warm-home-workbench.v1';
+const store = {
+  _s: null,
+  storageBroken: false,
+  defaults(){ return JSON.parse(JSON.stringify(DEFAULTS)); },
+  get s(){ if(!this._s) this.load(); return this._s; },
+  load(){
+    let raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); }
+    catch(e){ this.storageBroken = true; }
+    let data = {};
+    if(raw){ try { data = JSON.parse(raw) || {}; } catch(e){ data = {}; } }
+    const base = this.defaults();
+    Object.keys(base).forEach(function(k){
+      if(!(k in data) || data[k] == null) return;
+      if(Array.isArray(base[k])){ if(Array.isArray(data[k])) base[k] = data[k]; }
+      else if(typeof base[k] === 'object'){ if(typeof data[k] === 'object') base[k] = Object.assign(base[k], data[k]); }
+      else base[k] = data[k];
+    });
+    this._s = base;
+    return base;
+  },
+  save(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this._s)); }
+    catch(e){ toast('本地存不下更多数据了，建议先导出备份'); }
+  },
+  touch(){ this.save(); },
+  /* 采购需求 */
+  addWant(row){ row._id = uid(); row.createdAt = todayStr(); row.status = 'todo'; this.s.wants.unshift(row); this.save(); },
+  updateWant(id,patch){ const w = this.s.wants.find(x=>x._id===id); if(w){ Object.assign(w,patch); this.save(); } },
+  removeWant(id){ this.s.wants = this.s.wants.filter(x=>x._id!==id); this.save(); },
+  /* 库存 */
+  addItem(row){ row._id = uid(); row.addedAt = todayStr(); this.s.items.unshift(row); this.save(); return row; },
+  getItem(id){ return this.s.items.find(x=>x._id===id); },
+  updateItem(id,patch){ const it = this.getItem(id); if(it){ Object.assign(it,patch); this.save(); } },
+  removeItem(id){ this.s.items = this.s.items.filter(x=>x._id!==id); this.save(); },
+  /* 流水 */
+  addLog(row){ row._id = uid(); if(!row.date) row.date = todayStr(); this.s.logs.unshift(row); this.save(); },
+  removeLog(id){ this.s.logs = this.s.logs.filter(x=>x._id!==id); this.save(); },
+  /* 备份 */
+  exportState(){ const c = JSON.parse(JSON.stringify(this.s)); c.exportedAt = new Date().toISOString(); return c; },
+  importState(data){
+    const base = this.defaults();
+    Object.keys(base).forEach(function(k){
+      if(k in data && data[k] != null){
+        if(Array.isArray(base[k])){ if(Array.isArray(data[k])) base[k] = data[k]; }
+        else if(typeof base[k]==='object'){ if(typeof data[k]==='object') base[k] = Object.assign(base[k], data[k]); }
+        else base[k] = data[k];
+      }
+    });
+    this._s = base; this.save();
+  }
+};
+/* ==================================================================
+   4. 工具
+   ================================================================== */
+const el = id => document.getElementById(id);
+const S  = () => store.s;
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+  });
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function todayStr(){ return fmtDate(new Date()); }
+function stampStr(){ const d=new Date(); return ''+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate()); }
+function daysLeft(dateStr){
+  if(!dateStr) return null;
+  const t = new Date(dateStr + 'T00:00:00');
+  if(isNaN(t.getTime())) return null;
+  const n = new Date(); n.setHours(0,0,0,0);
+  return Math.round((t - n) / 86400000);
+}
+function monthKey(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
+function money(n){ return '¥' + (Math.round(Number(n)*100)/100).toLocaleString('zh-CN'); }
+let toastTimer;
+function toast(msg){
+  const t = el('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('on'); }, 2400);
+}
+/* 判定：该补货了吗 */
+function isLow(it){
+  if(it.track === 'state') return it.level === '没了' || it.level === '不多了';
+  const qty = Number(it.qty||0), low = Number(it.lowAt==null?1:it.lowAt);
+  return qty <= low;
+}
+function lowCount(){ return S().items.filter(isLow).length; }
+function expiringItems(){
+  return S().items.filter(function(it){
+    const d = daysLeft(it.expire);
+    return d !== null && d <= Number(S().soonDays||30);
+  }).sort(function(a,b){ return daysLeft(a.expire) - daysLeft(b.expire); });
+}
+function todoWants(){ return S().wants.filter(function(w){ return w.status !== 'bought'; }); }
+function doneWants(){ return S().wants.filter(function(w){ return w.status === 'bought'; }); }
+const URGENT_RANK = { '马上要':0, '这周':1, '不急':2 };
+function sortWants(list){
+  return list.slice().sort(function(a,b){
+    const ra = URGENT_RANK[a.urgent] == null ? 9 : URGENT_RANK[a.urgent];
+    const rb = URGENT_RANK[b.urgent] == null ? 9 : URGENT_RANK[b.urgent];
+    if(ra !== rb) return ra - rb;
+    return String(b.createdAt||'').localeCompare(String(a.createdAt||''));
+  });
+}
+function monthLogs(){ const k = monthKey(); return S().logs.filter(function(l){ return String(l.date||'').slice(0,7) === k; }); }
+function monthSpend(){ return monthLogs().reduce(function(a,l){ return a + (l.type==='入库' ? Number(l.amount||0) : 0); }, 0); }
+function monthWaste(){ return monthLogs().filter(function(l){ return l.type==='丢弃'; }).length; }
+function monthBuyTimes(){ return monthLogs().filter(function(l){ return l.type==='入库'; }).length; }
+/* ==================================================================
+   5. 视图片段
+   ================================================================== */
+function emptyState(iconName, title, sub, btn){
+  return '<div class="empty">'+
+    '<div class="big">'+icon(iconName,30)+'</div>'+
+    '<div class="et">'+esc(title)+'</div>'+
+    '<div class="es">'+esc(sub)+'</div>'+
+    (btn||'')+
+  '</div>';
+}
+function optionList(list, cur){
+  return list.map(function(o){
+    return '<option value="'+esc(o)+'"'+(String(o)===String(cur)?' selected':'')+'>'+esc(o)+'</option>';
+  }).join('');
+}
+/* ---------- 今日 ---------- */
+function viewToday(){
+  const todo = todoWants().length, exp = expiringItems().length, low = lowCount();
+  const allEmpty = !S().items.length && !S().wants.length;
+  let h = '';
+  if(allEmpty){
+    h += '<div class="hero"><div class="face">'+icon('spark',24)+'</div><div>'+
+      '<div class="ht">欢迎回家，这里是你的小屋</div>'+
+      '<div class="hs">先记一句「要买什么」，或者把家里现有的东西放进来。所有数据只存在这台设备上。</div>'+
+      '</div></div>';
+  }
+  h += '<div class="grid tiles">'+
+    tile('wants', '待买', todo, '件', todo?'去看看':'暂时没有', '') +
+    tile('expire', '临期', exp, '件', exp?'要看一眼':'都还新鲜', exp?'warn':'') +
+    tile('stock', '该补', low, '件', low?'要补货了':'还够用', low?'warn':'ok') +
+  '</div>';
+  h += '<div class="card">'+
+    '<h3><span class="h-l">'+icon('plus',18)+' 想到什么要买，先记一句</span></h3>'+
+    '<form class="quick" id="quickForm">'+
+      '<input id="quickInput" data-keep="1" autocomplete="off" placeholder="比如：酱油、孩子的酸奶、抽纸…">'+
+      '<button class="btn primary" type="submit">记下</button>'+
+    '</form>'+
+    '<div class="field-note">只记名字最快；想写「谁要的、要几件、急不急」，去「要买什么」里补。</div>'+
+  '</div>';
+  h += viewTodayWants();
+  h += '<div class="card">'+
+    '<h3><span class="h-l">'+icon('cal',18)+' 这个月的小结</span><span class="count">'+monthKey().replace('-',' 年 ')+' 月</span></h3>'+
+    '<div class="stat-line"><span class="k">买回来</span><span class="v">'+monthBuyTimes()+' 次</span></div>'+
+    '<div class="stat-line"><span class="k">花了</span><span class="v">'+money(monthSpend())+'</span></div>'+
+    '<div class="stat-line"><span class="k">丢掉（过期）</span><span class="v">'+monthWaste()+' 件</span></div>'+
+    '<div class="field-note">金额是入库时顺手填的，不填也不影响使用。</div>'+
+  '</div>';
+  const recent = S().logs.filter(function(l){ return l.type==='入库'; }).slice(0,4);
+  h += '<div class="card"><h3><span class="h-l">'+icon('cart',18)+' 最近买回</span></h3>';
+  if(!recent.length){
+    h += '<div class="hint">还没有买回记录。在「要买什么」里勾掉一件东西，就会自动记到这里。</div>';
+  }else{
+    h += '<div class="rows">' + recent.map(function(l){
+      return '<div class="row"><div class="grow">'+
+        '<div class="n">'+esc(l.name||'—')+(l.qty?' <span class="m" style="display:inline">'+esc(l.qty)+(l.unit?esc(l.unit):'')+'</span>':'')+'</div>'+
+        '<div class="m">'+esc(l.date||'') + (l.amount?' · '+(l.amount>0?money(l.amount):'') : '') + '</div>'+
+      '</div></div>';
+    }).join('') + '</div>';
+  }
+  h += '</div>';
+  h += '<div class="signature">'+esc(S().shopName||'暖心小屋')+' · '+esc(S().tagline||DEFAULTS.tagline)+'</div>';
+  return h;
+}
+/* ---------- 今日页的精简待买清单 ---------- */
+/* 只收「马上要」和「这周」，最多 5 条；「不急」不占首页 */
+const TODAY_WANT_MAX = 5;
+function todayWantPick(){
+  const sorted = sortWants(todoWants());
+  const soon = sorted.filter(function(w){ return ['马上要','这周'].indexOf(w.urgent||'这周') >= 0; });
+  return { total: sorted.length, soon: soon, pick: soon.slice(0, TODAY_WANT_MAX) };
+}
+function viewTodayWants(){
+  const t = todayWantPick();
+  let h = '<div class="card" id="todayWantsCard">'+
+    '<h3><span class="h-l">'+icon('wants',18)+' 今天要买</span><span class="count">'+t.soon.length+' 件</span></h3>';
+  if(!t.pick.length){
+    h += '<div class="hint">'+ (t.total
+      ? '今天没有急着要买的。清单里还有 '+t.total+' 件，都还没标急。'
+      : '清单是空的。想到什么就在上面记一句，不用记在脑子里。') +'</div>'+
+      '<div style="margin-top:12px"><button class="chip" data-goto="wants">'+icon('wants',16)+' 去「要买什么」</button></div>';
+  }else{
+    h += '<div class="rows">'+t.pick.map(function(w){
+      const meta = [esc(w.owner||'全家')];
+      if(w.qty) meta.push(esc(w.qty)+(w.unit?esc(w.unit):''));
+      if(w.note) meta.push(esc(w.note));
+      return '<div class="row">'+
+        '<button class="check" data-buy="'+w._id+'" title="买到了" aria-label="买到了">'+icon('check',20)+'</button>'+
+        '<div class="grow"><div class="n">'+esc(w.name)+'</div><div class="m">'+meta.join(' · ')+'</div></div>'+
+        '<span class="badge '+((w.urgent||'这周')==='马上要'?'b-danger':'b-warn')+'">'+esc(w.urgent||'这周')+'</span>'+
+      '</div>';
+    }).join('')+'</div>';
+    if(t.soon.length > t.pick.length){
+      h += '<div class="hint" style="margin-top:10px">还有 '+(t.soon.length-t.pick.length)+' 件急着要的没显示在上面。</div>';
+    }
+    h += '<div style="margin-top:12px"><button class="chip" data-goto="wants">'+icon('wants',16)+' 看全部 '+t.total+' 件</button></div>';
+  }
+  h += '</div>';
+  return h;
+}
+function tile(tab, key, num, unit, cap, cls){
+  return '<button class="tile '+(cls||'')+'" data-goto="'+tab+'">'+
+    '<div class="tk">'+icon(MODULES.filter(function(m){return m.id===tab;})[0].glyph,16)+' '+esc(key)+'</div>'+
+    '<div class="tv">'+num+'<span class="u">'+esc(unit)+'</span></div>'+
+    '<div class="cap">'+esc(cap)+'</div>'+
+  '</button>';
+}
+/* ---------- 要买什么 ---------- */
+function viewWants(){
+  const todo = sortWants(todoWants());
+  const done = doneWants();
+  const showDone = S().ui.wantsDone;
+  let h = '<div class="card">'+
+    '<h3><span class="h-l">'+icon('plus',18)+' 加一条采购需求</span></h3>'+
+    '<form class="quick" id="wantQuick">'+
+      '<input id="wantInput" data-keep="1" autocomplete="off" placeholder="想买什么？写完按回车">'+
+      '<button class="btn primary" type="submit">记下</button>'+
+    '</form>'+
+    '<div class="field-note">只记名字：写完按回车。想写细一点：把下面几栏填上，再点「加进清单」。</div>'+
+    '<div class="form-grid" style="margin-top:14px">'+
+      '<label class="field"><span>谁要的</span><select id="wantOwner">'+optionList(S().members,'全家')+'</select></label>'+
+      '<label class="field"><span>要几件</span><input id="wantQty" type="number" step="any" min="0" placeholder="可留空"></label>'+
+      '<label class="field"><span>单位</span><input id="wantUnit" type="text" placeholder="瓶 / 袋 / 盒"></label>'+
+      '<label class="field"><span>急不急</span><select id="wantUrgent"><option>马上要</option><option selected>这周</option><option>不急</option></select></label>'+
+      '<label class="field wide"><span>备注</span><input id="wantNote" type="text" placeholder="牌子、规格、哪家买…"></label>'+
+      '<div class="wide"><button class="btn" type="button" id="wantAddBtn">'+icon('plus',18)+' 加进清单</button></div>'+
+    '</div>'+
+  '</div>';
+  h += '<div class="card" id="wantsCard">'+
+    '<h3><span class="h-l">'+icon('wants',18)+' 待买清单</span><span class="count">'+todo.length+' 件</span></h3>';
+  if(!todo.length){
+    h += emptyState('wants','清单是空的','家里都够用。想到什么就在上面记一句，不用记在脑子里。');
+  }else{
+    ['马上要','这周','不急'].forEach(function(g){
+      const list = todo.filter(function(w){ return (w.urgent||'这周')===g; });
+      if(!list.length) return;
+      h += '<div class="group-head">'+esc(g)+'<span class="line"></span></div>';
+      h += '<div class="rows">'+list.map(wantRow).join('')+'</div>';
+    });
+    const other = todo.filter(function(w){ return ['马上要','这周','不急'].indexOf(w.urgent||'这周') < 0; });
+    if(other.length) h += '<div class="rows">'+other.map(wantRow).join('')+'</div>';
+  }
+  h += '</div>';
+  h += '<div class="card">'+
+    '<h3><span class="h-l">'+icon('check',18)+' 已买到</span>'+
+      '<button class="chip'+(showDone?' on':'')+'" id="toggleDone">'+(showDone?'收起':'展开 '+done.length+' 件')+'</button></h3>';
+  if(!done.length){
+    h += '<div class="hint">勾掉的东西会出现在这里，方便你回头看「上次买的是什么牌子」。</div>';
+  }else if(showDone){
+    h += '<div class="rows">'+done.slice(0,50).map(function(w){
+      return '<div class="row done"><div class="grow">'+
+        '<div class="n">'+esc(w.name)+'</div>'+
+        '<div class="m">'+esc(w.owner||'全家')+(w.doneAt?' · '+esc(w.doneAt)+' 买到':'')+(w.qty?' · '+esc(w.qty)+(w.unit?esc(w.unit):''):'')+'</div>'+
+      '</div>'+
+      '<button class="iconbtn plain" data-undo="'+w._id+'" title="撤销，放回待买" aria-label="撤销">'+icon('undo',18)+'</button>'+
+      '<button class="iconbtn plain" data-delwant="'+w._id+'" title="删除" aria-label="删除">'+icon('close',18)+'</button>'+
+      '</div>';
+    }).join('')+'</div>';
+  }else{
+    h += '<div class="hint">已买到 '+done.length+' 件，点右上角展开。</div>';
+  }
+  h += '</div>';
+  return h;
+}
+function wantRow(w){
+  const meta = [];
+  meta.push(esc(w.owner||'全家'));
+  if(w.qty) meta.push(esc(w.qty) + (w.unit?esc(w.unit):''));
+  if(w.cat) meta.push(esc(w.cat));
+  if(w.note) meta.push(esc(w.note));
+  return '<div class="row">'+
+    '<button class="check" data-buy="'+w._id+'" title="买到了" aria-label="买到了">'+icon('check',20)+'</button>'+
+    '<div class="grow"><div class="n">'+esc(w.name)+'</div><div class="m">'+meta.join(' · ')+'</div></div>'+
+    '<button class="iconbtn plain" data-delwant="'+w._id+'" title="删除" aria-label="删除">'+icon('close',18)+'</button>'+
+  '</div>';
+}
+/* ---------- 家里有啥 ---------- */
+function viewStock(){
+  const u = S().ui;
+  const cats = S().cats, places = S().places;
+  let h = '<div class="card">'+
+    '<div class="quick">'+
+      '<input id="stockSearch" data-keep="1" autocomplete="off" placeholder="搜物品名、位置、备注…" value="'+esc(u.stockQ)+'">'+
+      '<button class="btn primary" id="addItemBtn">'+icon('plus',18)+' 添加物品</button>'+
+    '</div>'+
+    '<div class="chips" style="margin-top:14px">'+
+      chip('all','全部', u.stockFilter==='all')+
+      chip('low','该补了', u.stockFilter==='low')+
+      chip('exp','临期的', u.stockFilter==='exp')+
+    '</div>'+
+    '<div class="form-grid" style="margin-top:12px">'+
+      '<label class="field"><span>分类</span><select id="stockCat"><option value="">全部分类</option>'+optionList(cats,u.stockCat)+'</select></label>'+
+      '<label class="field"><span>存放位置</span><select id="stockPlace"><option value="">全部位置</option>'+optionList(places,u.stockPlace)+'</select></label>'+
+    '</div>'+
+  '</div>';
+  h += '<div id="stockBody">'+stockBody()+'</div>';
+  return h;
+}
+function chip(v,label,on){
+  return '<button class="chip'+(on?' on':'')+'" data-filter="'+v+'">'+esc(label)+'</button>';
+}
+function stockBody(){
+  const u = S().ui;
+  let list = S().items.slice();
+  if(u.stockFilter === 'low') list = list.filter(isLow);
+  if(u.stockFilter === 'exp') list = list.filter(function(it){ const d=daysLeft(it.expire); return d!==null && d<=Number(S().soonDays||30); });
+  if(u.stockCat) list = list.filter(function(it){ return it.cat === u.stockCat; });
+  if(u.stockPlace) list = list.filter(function(it){ return it.place === u.stockPlace; });
+  if(u.stockQ){
+    const q = u.stockQ.toLowerCase();
+    list = list.filter(function(it){
+      return [it.name,it.cat,it.place,it.note,it.owner].some(function(v){ return String(v||'').toLowerCase().indexOf(q) >= 0; });
+    });
+  }
+  list.sort(function(a,b){
+    const la = isLow(a)?0:1, lb = isLow(b)?0:1;
+    if(la !== lb) return la - lb;
+    const da = daysLeft(a.expire), db = daysLeft(b.expire);
+    if(da !== null && db !== null && da !== db) return da - db;
+    if(da !== null && db === null) return -1;
+    if(da === null && db !== null) return 1;
+    return String(a.name||'').localeCompare(String(b.name||''),'zh-CN');
+  });
+  let h = '';
+  const total = S().items.length;
+  h += '<div class="card"><h3><span class="h-l">'+icon('stock',18)+' 库存</span><span class="count">'+
+       (list.length===total ? total+' 件' : list.length+' / '+total+' 件')+'</span></h3>';
+  if(!total){
+    h += emptyState('stock','柜子还是空的','把家里现有的东西放进来：日用品、零食、清洁剂都行。之后取用点一下就减一。',
+      '<button class="btn primary" data-newitem="1">'+icon('plus',18)+' 添加第一件物品</button>');
+  }else if(!list.length){
+    h += emptyState('stock','这个筛选下没有东西','换个分类或清掉筛选看看。',
+      '<button class="btn" data-clearfilter="1">清掉筛选</button>');
+  }else{
+    h += '<div class="items">'+list.map(itemCard).join('')+'</div>';
+  }
+  h += '</div>';
+  /* 买回记录 */
+  const logs = S().logs;
+  h += '<div class="card"><h3><span class="h-l">'+icon('cart',18)+' 买回记录</span>'+
+       '<button class="chip'+(S().ui.stockSub==='logs'?' on':'')+'" id="toggleLogs">'+(S().ui.stockSub==='logs'?'收起':'展开 '+logs.length+' 条')+'</button></h3>';
+  if(!logs.length){
+    h += '<div class="hint">还没记录。在「要买什么」里勾掉一件东西，或在这里手动加一条。</div>';
+  }else if(S().ui.stockSub === 'logs'){
+    h += '<div class="rows">'+logs.slice(0,80).map(function(l){
+      const b = l.type==='入库' ? 'b-ok' : (l.type==='丢弃' ? 'b-danger' : 'b-plain');
+      return '<div class="row">'+
+        '<span class="badge '+b+'">'+esc(l.type)+'</span>'+
+        '<div class="grow"><div class="n">'+esc(l.name||'—')+'</div>'+
+        '<div class="m">'+esc(l.date||'')+(l.qty?' · '+esc(l.qty)+(l.unit?esc(l.unit):''):'')+(l.amount?' · '+money(l.amount):'')+'</div></div>'+
+        '<button class="iconbtn plain" data-dellog="'+l._id+'" title="删除" aria-label="删除">'+icon('close',18)+'</button>'+
+      '</div>';
+    }).join('')+'</div>';
+  }else{
+    h += '<div class="hint">共 '+logs.length+' 条记录，点右上角展开。</div>';
+  }
+  h += '</div>';
+  return h;
+}
+function itemCard(it){
+  const low = isLow(it);
+  const d = daysLeft(it.expire);
+  let expBadge = '';
+  if(d !== null){
+    if(d < 0) expBadge = '<span class="badge b-danger">过期 '+Math.abs(d)+' 天</span>';
+    else if(d <= Number(S().freshDays||7)) expBadge = '<span class="badge b-warn">还有 '+d+' 天</span>';
+    else if(d <= Number(S().soonDays||30)) expBadge = '<span class="badge b-note">还有 '+d+' 天</span>';
+    else expBadge = '<span class="badge b-plain">'+esc(it.expire)+'</span>';
+  }
+  const meta = [];
+  if(it.place) meta.push(esc(it.place));
+  if(it.cat) meta.push(esc(it.cat));
+  meta.push(esc(it.owner||'全家'));
+  let qtyHTML = '';
+  if(it.track === 'state'){
+    const lv = it.level || '充足';
+    qtyHTML = '<div class="levels">'+
+      ['充足','不多了','没了'].map(function(v){
+        const on = lv === v;
+        const danger = (v === '没了' && on);
+        return '<button class="lv'+(on?' on':'')+(danger?' danger':'')+'" data-lv="'+it._id+'" data-val="'+v+'">'+v+'</button>';
+      }).join('')+
+    '</div>';
+  }else{
+    qtyHTML = '<div class="stepper">'+
+      '<button class="step-btn" data-dec="'+it._id+'" aria-label="用掉一件">'+icon('minus',20)+'</button>'+
+      '<div class="qty">'+(it.qty==null?0:esc(it.qty))+'<span class="u">'+esc(it.unit||'件')+'</span></div>'+
+      '<button class="step-btn" data-inc="'+it._id+'" aria-label="加一件">'+icon('plus',20)+'</button>'+
+    '</div>';
+  }
+  return '<div class="item'+(low?' low':'')+'">'+
+    '<div class="item-top">'+
+      '<div class="item-name">'+esc(it.name)+'</div>'+
+      (low ? '<span class="badge b-danger">该补</span>' : '')+
+    '</div>'+
+    '<div class="item-meta">'+meta.join(' · ')+'</div>'+
+    qtyHTML+
+    (expBadge ? '<div>'+expBadge+'</div>' : '')+
+    (it.note ? '<div class="item-meta">'+esc(it.note)+'</div>' : '')+
+    '<div class="item-foot">'+
+      '<span class="hint">'+(it.track==='state'?'记状态':'记数量')+'</span>'+
+      '<div class="item-acts">'+
+        '<button class="iconbtn plain" data-edititem="'+it._id+'" title="修改" aria-label="修改">'+icon('edit',18)+'</button>'+
+        '<button class="iconbtn plain" data-delitem="'+it._id+'" title="删除" aria-label="删除">'+icon('close',18)+'</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+/* ---------- 快过期了 ---------- */
+function viewExpire(){
+  const list = expiringItems();
+  const over = list.filter(function(it){ return daysLeft(it.expire) < 0; });
+  const week = list.filter(function(it){ const d=daysLeft(it.expire); return d>=0 && d<=Number(S().freshDays||7); });
+  const soon = list.filter(function(it){ const d=daysLeft(it.expire); return d>Number(S().freshDays||7) && d<=Number(S().soonDays||30); });
+  let h = '<div class="grid tiles">'+
+    tile2('已过期', over.length, over.length?'要清理了':'没有', over.length?'warn':'ok')+
+    tile2('7 天内', week.length, week.length?'抓紧用':'还稳', week.length?'warn':'')+
+    tile2('30 天内', soon.length, soon.length?'心里有数':'很干净', soon.length?'':'ok')+
+  '</div>';
+  h += '<div class="card">'+
+    '<h3><span class="h-l">'+icon('expire',18)+' 需要处理的</span><span class="count">'+list.length+' 件</span></h3>'+
+    '<div class="hint">只显示填了到期日的东西。处理完会自动扣库存、记一笔流水。</div>'+
+    '<div class="divider"></div>';
+  if(!list.length){
+    h += emptyState('check','没有快过期的东西','家里清清爽爽。记得新增物品时填上到期日，以后这里就会替你盯着。');
+  }else{
+    h += '<div class="rows">'+list.map(expireRow).join('')+'</div>';
+  }
+  h += '</div>';
+  const noExp = S().items.filter(function(it){ return !it.expire; });
+  if(noExp.length){
+    h += '<div class="card"><h3><span class="h-l">'+icon('stock',18)+' 没填到期日的</span><span class="count">'+noExp.length+' 件</span></h3>'+
+      '<div class="hint">这些是耐用品或还没记日期的东西。点一下可以补上到期日。</div>'+
+      '<div class="chips" style="margin-top:12px">'+
+      noExp.slice(0,30).map(function(it){ return '<button class="chip" data-edititem="'+it._id+'">'+esc(it.name)+'</button>'; }).join('')+
+      '</div></div>';
+  }
+  return h;
+}
+function tile2(k, num, cap, cls){
+  return '<div class="tile '+(cls||'')+'">'+
+    '<div class="tk">'+esc(k)+'</div>'+
+    '<div class="tv">'+num+'<span class="u">件</span></div>'+
+    '<div class="cap">'+esc(cap)+'</div>'+
+  '</div>';
+}
+function expireRow(it){
+  const d = daysLeft(it.expire);
+  const badge = d < 0
+    ? '<span class="badge b-danger">已过期 '+Math.abs(d)+' 天</span>'
+    : (d <= Number(S().freshDays||7) ? '<span class="badge b-warn">还有 '+d+' 天</span>' : '<span class="badge b-note">还有 '+d+' 天</span>');
+  const qty = it.track === 'state'
+    ? esc(it.level||'充足')
+    : (Number(it.qty||0) + esc(it.unit||'件'));
+  return '<div class="row" style="flex-wrap:wrap">'+
+    '<div class="grow" style="min-width:150px">'+
+      '<div class="n">'+esc(it.name)+' '+badge+'</div>'+
+      '<div class="m">'+esc(it.expire)+' · 剩 '+qty+(it.place?' · '+esc(it.place):'')+'</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn sm mint" data-use="'+it._id+'">'+icon('check',16)+' 用掉了</button>'+
+      '<button class="btn sm" data-waste="'+it._id+'">'+icon('trash',16)+' 丢掉了</button>'+
+      '<button class="btn sm ghost" data-edititem="'+it._id+'">改期</button>'+
+    '</div>'+
+  '</div>';
+}
+/* ---------- 设置 ---------- */
+function viewSettings(){
+  const s = S();
+  let h = '';
+  h += '<div class="card"><h3><span class="h-l">'+icon('spark',18)+' 小屋的名字</span></h3>'+
+    '<label class="field"><span>名字</span>'+
+    '<input id="setName" data-keep="1" type="text" value="'+esc(s.shopName)+'" placeholder="暖心小屋"></label>'+
+    '<label class="field" style="margin-top:14px"><span>名字下面那句话</span>'+
+    '<input id="setTagline" data-keep="1" type="text" maxlength="14" value="'+esc(s.tagline)+'" placeholder="细水长流，岁岁年年"></label>'+
+    '<div class="field-note">改完自动保存。第二栏建议 12 个字以内，太长侧栏会折行；它还会作为「今日」页末尾的落款显示。</div></div>';
+  h += '<div class="card"><h3><span class="h-l">'+icon('wants',18)+' 名单设置</span></h3>'+
+    '<div class="form-grid">'+
+      '<label class="field wide"><span>家庭成员（用逗号分开）</span><input id="setMembers" type="text" value="'+esc(s.members.join('，'))+'"></label>'+
+      '<label class="field wide"><span>物品种类（用逗号分开）</span><input id="setCats" type="text" value="'+esc(s.cats.join('，'))+'"></label>'+
+      '<label class="field wide"><span>存放位置（用逗号分开）</span><input id="setPlaces" type="text" value="'+esc(s.places.join('，'))+'"></label>'+
+      '<label class="field"><span>临期提醒：多少天内</span><input id="setFresh" type="number" min="1" max="60" value="'+esc(s.freshDays)+'"></label>'+
+      '<label class="field"><span>关注范围：多少天内</span><input id="setSoon" type="number" min="1" max="365" value="'+esc(s.soonDays)+'"></label>'+
+    '</div>'+
+    '<div class="field-note">改完点下面的按钮保存。已有记录不会受影响。</div>'+
+    '<div class="modal-foot" style="margin-top:14px"><button class="btn primary" id="saveSettings">'+icon('check',18)+' 保存设置</button></div>'+
+  '</div>';
+  h += '<div class="card"><h3><span class="h-l">'+icon('cart',18)+' 导出与备份</span></h3>'+
+    '<div class="chips">'+
+      '<button class="btn sm" data-export="wants">导出 采购需求 CSV</button>'+
+      '<button class="btn sm" data-export="items">导出 库存 CSV</button>'+
+      '<button class="btn sm" data-export="logs">导出 流水 CSV</button>'+
+      '<button class="btn sm" data-export="all">导出 全部合并 CSV</button>'+
+    '</div>'+
+    '<div class="divider"></div>'+
+    '<div class="chips">'+
+      '<button class="btn sm primary" id="backupBtn">'+icon('check',16)+' 下载 JSON 备份</button>'+
+      '<button class="btn sm" id="restoreBtn">'+icon('undo',16)+' 导入备份还原</button>'+
+      '<input type="file" id="fileInput" accept=".json,application/json" hidden>'+
+    '</div>'+
+    '<div class="hint" style="margin-top:14px">数据只存在这台设备的浏览器里，不上传任何服务器。换手机或换电脑时：先「下载 JSON 备份」，到新设备用「导入备份还原」。CSV 用 Excel / WPS 打开，中文不会乱码。</div>'+
+  '</div>';
+  h += '<div class="card"><h3><span class="h-l">'+icon('stock',18)+' 数据概览</span></h3>'+
+    '<div class="stat-line"><span class="k">采购需求</span><span class="v">'+s.wants.length+' 条</span></div>'+
+    '<div class="stat-line"><span class="k">库存物品</span><span class="v">'+s.items.length+' 件</span></div>'+
+    '<div class="stat-line"><span class="k">出入库流水</span><span class="v">'+s.logs.length+' 条</span></div>'+
+    '<div class="stat-line"><span class="k">数据占用</span><span class="v">'+storageSize()+'</span></div>'+
+  '</div>';
+  h += '<div class="card"><h3><span class="h-l">'+icon('spark',18)+' 怎么用最省事</span></h3>'+
+    '<div class="hint" style="line-height:1.9">'+
+      '1. 想到要买什么，在「今日」页顶部一句话记下，不用填别的。<br>'+
+      '2. 去超市前打开「要买什么」，按「马上要 / 这周 / 不急」分好了组。<br>'+
+      '3. 买回来点圆圈勾选，填个数填个价，自动进「家里有啥」。<br>'+
+      '4. 平时拿东西，在「家里有啥」点 − 减一；剩到阈值会自动冒出「该补」。<br>'+
+      '5. 每周翻一次「快过期了」，该用的用掉、该扔的扔掉，顺手记一笔损耗。'+
+    '</div></div>';
+  h += '<div class="card"><h3><span class="h-l">'+icon('trash',18)+' 危险操作</span></h3>'+
+    '<div class="hint">清空会删掉全部记录，且无法恢复（备份文件除外）。</div>'+
+    '<div class="modal-foot" style="margin-top:14px"><button class="btn" id="wipeBtn" style="color:var(--s-danger-ink)">清空全部数据</button></div></div>';
+  return h;
+}
+function storageSize(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY) || '';
+    const kb = raw.length / 1024;
+    return kb < 1024 ? (Math.round(kb*10)/10)+' KB' : (Math.round(kb/102.4)/10)+' MB';
+  }catch(e){ return '—'; }
+}
+/* ==================================================================
+   6. 路由与渲染
+   ================================================================== */
+let lastTab = null;
+function buildNav(){
+  el('nav').innerHTML = MODULES.map(function(m){
+    return '<button class="tab'+(S().tab===m.id?' active':'')+'" data-goto="'+m.id+'">'+
+      '<span class="glyph">'+icon(m.glyph,20)+'</span><span class="label">'+esc(m.name)+'</span></button>';
+  }).join('');
+  el('tabbar').innerHTML = MODULES.map(function(m){
+    return '<button class="'+(S().tab===m.id?'active':'')+'" data-goto="'+m.id+'">'+
+      '<span class="glyph">'+icon(m.glyph,20)+'</span>'+esc(m.name)+'</button>';
+  }).join('');
+  const sf = document.querySelector('.side-foot .tab');
+  if(sf){
+    sf.className = 'tab' + (S().tab==='__settings' ? ' active' : '');
+    sf.querySelector('.glyph').innerHTML = icon('settings',20);
+  }
+}
+function render(){
+  const view = el('viewEl');
+  const keptTop = (lastTab === S().tab) ? view.scrollTop : 0;
+  const active = document.activeElement;
+  let keepId = null, selStart = null, selEnd = null;
+  if(active && active.dataset && active.dataset.keep && active.id){
+    keepId = active.id;
+    try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch(e){}
+  }
+  buildNav();
+  const tab = S().tab;
+  el('brandTitle').textContent = S().shopName || '暖心小屋';
+  el('brandSub').textContent = S().tagline || DEFAULTS.tagline;
+  el('modalCloseBtn').innerHTML = icon('close',20);
+  const sb = el('settingsBtn');
+  if(sb){
+    const onSettings = tab === '__settings';
+    sb.innerHTML = icon(onSettings ? 'undo' : 'settings', 20);
+    sb.dataset.goto = onSettings ? 'today' : '__settings';
+    sb.classList.toggle('on', onSettings);
+    sb.setAttribute('aria-label', onSettings ? '返回首页' : '设置');
+  }
+  if(tab === '__settings'){
+    el('pageTitle').textContent = '设置 · 导出';
+    el('pageSub').textContent = '数据与偏好';
+    el('pageActions').innerHTML = '';
+    el('viewRoot').innerHTML = viewSettings();
+  }else{
+    const m = MODULES.filter(function(x){ return x.id === tab; })[0] || MODULES[0];
+    el('pageTitle').textContent = m.name;
+    el('pageSub').textContent = m.sub;
+    el('pageActions').innerHTML = m.id === 'today' ? '' : '<button class="btn sm" data-export="'+exportKeyOf(m.id)+'">导出 CSV</button>';
+    let body = '';
+    if(m.id === 'today')  body = viewToday();
+    if(m.id === 'wants')  body = viewWants();
+    if(m.id === 'stock')  body = viewStock();
+    if(m.id === 'expire') body = viewExpire();
+    el('viewRoot').innerHTML = body;
+  }
+  view.scrollTop = keptTop;
+  lastTab = tab;
+  if(keepId){
+    const e2 = document.getElementById(keepId);
+    if(e2){
+      e2.focus();
+      try { if(selStart != null) e2.setSelectionRange(selStart, selEnd); } catch(err){}
+    }
+  }
+}
+function exportKeyOf(id){
+  if(id === 'wants') return 'wants';
+  if(id === 'logs')  return 'logs';
+  return 'items';
+}
+function goto(tab){
+  S().tab = tab; store.save();
+  if(tab !== lastTab) el('viewEl').scrollTop = 0;
+  render();
+}
+/* ==================================================================
+   7. 弹层
+   ================================================================== */
+let modalSubmit = null;
+function openModal(opt){
+  el('modalTitle').textContent = opt.title || '';
+  el('modalSub').textContent = opt.sub || '';
+  el('modalSub').style.display = opt.sub ? '' : 'none';
+  el('modalBody').innerHTML = opt.body || '';
+  el('modalFoot').innerHTML = (opt.extra || '') +
+    '<button class="btn primary" type="submit" form="modalForm">'+esc(opt.submitText || '保存')+'</button>';
+  modalSubmit = opt.onSubmit || null;
+  el('modal').hidden = false;
+  const f = document.getElementById('modalForm');
+  if(f){
+    const first = f.querySelector('input,select,textarea');
+    if(first) setTimeout(function(){ try{ first.focus(); }catch(e){} }, 80);
+  }
+}
+function closeModal(){
+  el('modal').hidden = true;
+  modalSubmit = null;
+}
+function formObj(f){
+  const o = {};
+  new FormData(f).forEach(function(v,k){ o[k] = typeof v === 'string' ? v.trim() : v; });
+  return o;
+}
+/* ---- 入库弹层（从采购需求勾选进入） ---- */
+function openBuyModal(wantId){
+  const w = S().wants.filter(function(x){ return x._id === wantId; })[0];
+  if(!w) return;
+  openModal({
+    title: '买到了，入库吧',
+    sub: '填几件、放哪儿，它就会进「家里有啥」。只勾选不入库也行。',
+    body:
+      '<form id="modalForm" class="form-grid">'+
+        fText('name','买了什么', w.name, '', 'text', true)+
+        fNum('qty','数量', w.qty, '留空 = 只记状态')+
+        fText('unit','单位', w.unit, '瓶 / 袋 / 盒')+
+        fDate('expire','到期日','')+
+        fNum('amount','花了多少（选填）','')+
+        fSel('place','放哪儿', S().places[0], S().places)+
+        fSel('cat','分类', w.cat || S().cats[0], S().cats)+
+        fSel('owner','谁用', w.owner || S().members[0], S().members)+
+        fNum('lowAt','剩多少提醒补货', 1)+
+      '</form>'+
+      '<div class="field-note">数量留空 → 这件东西以后用「充足 / 不多了 / 没了」三档来记，最省事。</div>',
+    submitText: '入库并标记买到',
+    extra: '<button type="button" class="btn" id="skipStockBtn">只标记买到</button>',
+    onSubmit: function(d){
+      const qty = d.qty === '' ? null : Number(d.qty);
+      const patch = { status:'bought', doneAt: todayStr() };
+      if(d.name) patch.name = d.name;
+      store.updateWant(wantId, patch);
+      if(qty !== null || d.expire){
+        store.addItem({
+          name: d.name || w.name,
+          cat: d.cat, place: d.place, owner: d.owner,
+          track: qty === null ? 'state' : 'count',
+          qty: qty === null ? null : qty,
+          unit: d.unit || (qty === null ? '' : '件'),
+          level: '充足',
+          lowAt: d.lowAt === '' ? 1 : Number(d.lowAt),
+          expire: d.expire || '',
+          note: w.note || ''
+        });
+      }
+      store.addLog({ date: todayStr(), type:'入库', name: d.name || w.name, qty: qty===null?'':qty, unit: d.unit||'', amount: d.amount===''?0:Number(d.amount) });
+      closeModal(); render();
+      toast('已入库，也记好了');
+    }
+  });
+  const skip = el('skipStockBtn');
+  if(skip) skip.onclick = function(){
+    store.updateWant(wantId, { status:'bought', doneAt: todayStr() });
+    closeModal(); render(); toast('标记为买到了');
+  };
+}
+/* ---- 新增 / 编辑物品 ---- */
+function openItemModal(itemId){
+  const it = itemId ? store.getItem(itemId) : null;
+  const isEdit = !!it;
+  const cur = it || { track:'count', qty:'', unit:'', lowAt:1, level:'充足', expire:'', cat:S().cats[0], place:S().places[0], owner:S().members[0], note:'', name:'' };
+  openModal({
+    title: isEdit ? '修改物品' : '添加一件物品',
+    sub: isEdit ? '' : '家里已经有的东西，放进来以后取用点一下就减一。',
+    body:
+      '<form id="modalForm" class="form-grid">'+
+        fText('name','叫什么', cur.name, '例如：抽纸、牛奶、洗衣液', 'text', true)+
+        fSel('cat','分类', cur.cat, S().cats)+
+        fSel('place','放哪儿', cur.place, S().places)+
+        fSel('owner','谁用', cur.owner, S().members)+
+        '<label class="field wide"><span>怎么记这件东西</span>'+
+          '<select name="track" id="trackSel">'+
+            '<option value="count"'+(cur.track==='count'?' selected':'')+'>记数量（比如抽纸 3 包）</option>'+
+            '<option value="state"'+(cur.track==='state'?' selected':'')+'>只记状态（充足 / 不多了 / 没了）</option>'+
+          '</select></label>'+
+        '<div class="wide" id="trackCount" style="display:'+(cur.track==='count'?'block':'none')+'">'+
+          '<div class="form-grid">'+
+            fNum('qty','现在有几件', cur.qty === null ? '' : cur.qty, '0')+
+            fText('unit','单位', cur.unit, '包 / 瓶 / 盒')+
+            fNum('lowAt','剩多少提醒补货', cur.lowAt, '1')+
+          '</div>'+
+        '</div>'+
+        '<div class="wide" id="trackState" style="display:'+(cur.track==='state'?'block':'none')+'">'+
+          '<label class="field"><span>现在的状态</span><select name="level">'+
+          ['充足','不多了','没了'].map(function(v){ return '<option'+(cur.level===v?' selected':'')+'>'+v+'</option>'; }).join('')+
+          '</select></label>'+
+        '</div>'+
+        fDate('expire','到期日（选填）', cur.expire)+
+        fText('note','备注', cur.note, '牌子、规格…', 'text', false, 'wide')+
+      '</form>'+
+      '<div class="field-note">填了到期日，才会出现在「快过期了」页里。</div>',
+    submitText: isEdit ? '保存修改' : '放进来',
+    onSubmit: function(d){
+      const track = d.track || 'count';
+      const row = {
+        name: d.name, cat: d.cat, place: d.place, owner: d.owner,
+        track: track,
+        qty: track === 'count' ? (d.qty === '' ? 0 : Number(d.qty)) : null,
+        unit: d.unit || '',
+        lowAt: d.lowAt === '' ? 1 : Number(d.lowAt),
+        level: track === 'state' ? (d.level || '充足') : '',
+        expire: d.expire || '',
+        note: d.note || ''
+      };
+      if(isEdit){ store.updateItem(itemId, row); toast('改好了'); }
+      else { store.addItem(row); toast('放进来啦'); }
+      closeModal(); render();
+    }
+  });
+  const sel = el('trackSel');
+  if(sel) sel.onchange = function(){
+    el('trackCount').style.display = sel.value === 'count' ? 'block' : 'none';
+    el('trackState').style.display = sel.value === 'state' ? 'block' : 'none';
+  };
+}
+/* ---- 丢弃弹层 ---- */
+function openWasteModal(itemId){
+  const it = store.getItem(itemId);
+  if(!it) return;
+  openModal({
+    title: '丢掉「'+it.name+'」',
+    sub: '会扣掉库存并记一笔损耗，之后能在买回记录里看到这个月扔了多少。',
+    body:
+      '<form id="modalForm" class="form-grid">'+
+        fNum('qty','丢了几件', 1)+
+        fText('unit','单位', it.unit || '件')+
+        fNum('amount','大概值多少钱（选填）','')+
+        fText('note','原因', '过期了 / 变质了', 'text', false, 'wide')+
+      '</form>',
+    submitText: '确认丢掉',
+    onSubmit: function(d){
+      const n = d.qty === '' ? 1 : Number(d.qty);
+      if(it.track === 'count'){
+        const left = Math.max(0, Number(it.qty||0) - n);
+        store.updateItem(itemId, { qty: left });
+      }else{
+        store.updateItem(itemId, { level: '没了' });
+      }
+      store.addLog({ date: todayStr(), type:'丢弃', name: it.name, qty: n, unit: d.unit || it.unit || '', amount: d.amount === '' ? 0 : Number(d.amount), note: d.note || '' });
+      closeModal(); render(); toast('记下了，别心疼');
+    }
+  });
+}
+/* ---- 表单字段小工具 ---- */
+function fText(name,label,val,ph,type,required,cls){
+  return '<label class="field '+(cls||'')+'"><span>'+esc(label)+(required?' *':'')+'</span>'+
+    '<input name="'+name+'" type="'+(type||'text')+'" value="'+esc(val==null?'':val)+'" placeholder="'+esc(ph||'')+'"'+
+    (required?' required data-label="'+esc(label)+'"':'')+'></label>';
+}
+function fNum(name,label,val,ph){
+  return '<label class="field"><span>'+esc(label)+'</span>'+
+    '<input name="'+name+'" type="number" step="any" inputmode="decimal" value="'+(val==null||val===''?'':esc(val))+'" placeholder="'+esc(ph||'')+'"></label>';
+}
+function fDate(name,label,val){
+  return '<label class="field"><span>'+esc(label)+'</span>'+
+    '<input name="'+name+'" type="date" value="'+esc(val||'')+'"></label>';
+}
+function fSel(name,label,val,options){
+  return '<label class="field"><span>'+esc(label)+'</span><select name="'+name+'">'+optionList(options,val)+'</select></label>';
+}
+/* ==================================================================
+   8. 导出
+   ================================================================== */
+const csv = {
+  esc: function(v){
+    const s = v == null ? '' : String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  },
+  build: function(rows, cols){
+    const head = cols.map(function(c){ return csv.esc(c.label); }).join(',');
+    const body = rows.map(function(r){ return cols.map(function(c){ return csv.esc(c.get(r)); }).join(','); }).join('\r\n');
+    return '\uFEFF' + head + '\r\n' + body;
+  },
+  download: function(filename, text, mime){
+    const blob = new Blob([text], { type: (mime||'text/csv') + ';charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1500);
+  },
+  COLS: {
+    wants: [
+      {label:'物品名', get:function(r){return r.name;}},
+      {label:'谁要的', get:function(r){return r.owner;}},
+      {label:'分类',   get:function(r){return r.cat;}},
+      {label:'数量',   get:function(r){return r.qty;}},
+      {label:'单位',   get:function(r){return r.unit;}},
+      {label:'急不急', get:function(r){return r.urgent;}},
+      {label:'状态',   get:function(r){return r.status==='bought'?'已买到':'待买';}},
+      {label:'登记日', get:function(r){return r.createdAt;}},
+      {label:'买到日', get:function(r){return r.doneAt;}},
+      {label:'备注',   get:function(r){return r.note;}}
+    ],
+    items: [
+      {label:'物品名',   get:function(r){return r.name;}},
+      {label:'分类',     get:function(r){return r.cat;}},
+      {label:'谁用',     get:function(r){return r.owner;}},
+      {label:'记法',     get:function(r){return r.track==='state'?'记状态':'记数量';}},
+      {label:'数量',     get:function(r){return r.track==='state'?'':r.qty;}},
+      {label:'单位',     get:function(r){return r.unit;}},
+      {label:'状态',     get:function(r){return r.track==='state'?(r.level||''):(isLow(r)?'该补':'充足');}},
+      {label:'补货阈值', get:function(r){return r.track==='state'?'':r.lowAt;}},
+      {label:'到期日',   get:function(r){return r.expire;}},
+      {label:'存放位置', get:function(r){return r.place;}},
+      {label:'备注',     get:function(r){return r.note;}}
+    ],
+    logs: [
+      {label:'日期',   get:function(r){return r.date;}},
+      {label:'类型',   get:function(r){return r.type;}},
+      {label:'物品',   get:function(r){return r.name;}},
+      {label:'数量',   get:function(r){return r.qty;}},
+      {label:'单位',   get:function(r){return r.unit;}},
+      {label:'金额',   get:function(r){return r.amount||'';}},
+      {label:'备注',   get:function(r){return r.note;}}
+    ]
+  },
+  names: { wants:'采购需求', items:'库存清单', logs:'出入库流水' },
+  exportOne: function(key){
+    let rows = [];
+    if(key === 'wants') rows = S().wants;
+    if(key === 'items') rows = S().items;
+    if(key === 'logs')  rows = S().logs;
+    if(!rows.length) return toast('「' + (this.names[key]||key) + '」还没有数据');
+    this.download((S().shopName||'工作台') + '-' + this.names[key] + '-' + stampStr() + '.csv',
+      this.build(rows, this.COLS[key]));
+    toast('已导出 ' + rows.length + ' 条');
+  },
+  exportAll: function(){
+    const all = [];
+    S().wants.forEach(function(r){
+      all.push({ m:'采购需求', d:r.createdAt, n:r.name, c:r.cat, o:r.owner, q:r.qty, u:r.unit,
+        s:(r.status==='bought'?'已买到':'待买') + (r.urgent?' · '+r.urgent:''), e:'', p:'', a:'', nt:r.note });
+    });
+    S().items.forEach(function(r){
+      all.push({ m:'库存物品', d:r.addedAt, n:r.name, c:r.cat, o:r.owner, q:(r.track==='state'?'':r.qty), u:r.unit,
+        s:(r.track==='state'?(r.level||''):(isLow(r)?'该补':'充足')), e:r.expire, p:r.place, a:'', nt:r.note });
+    });
+    S().logs.forEach(function(r){
+      all.push({ m:'出入库流水', d:r.date, n:r.name, c:'', o:'', q:r.qty, u:r.unit, s:r.type, e:'', p:'', a:(r.amount||''), nt:r.note });
+    });
+    if(!all.length) return toast('还没有任何数据');
+    const cols = [
+      {label:'模块', get:function(r){return r.m;}},
+      {label:'日期', get:function(r){return r.d;}},
+      {label:'名称', get:function(r){return r.n;}},
+      {label:'分类', get:function(r){return r.c;}},
+      {label:'谁',   get:function(r){return r.o;}},
+      {label:'数量', get:function(r){return r.q;}},
+      {label:'单位', get:function(r){return r.u;}},
+      {label:'状态', get:function(r){return r.s;}},
+      {label:'到期日', get:function(r){return r.e;}},
+      {label:'存放位置', get:function(r){return r.p;}},
+      {label:'金额', get:function(r){return r.a;}},
+      {label:'备注', get:function(r){return r.nt;}}
+    ];
+    this.download((S().shopName||'工作台') + '-全部-' + stampStr() + '.csv', this.build(all, cols));
+    toast('已导出全部 ' + all.length + ' 条');
+  },
+  exportJSON: function(){
+    this.download((S().shopName||'工作台') + '-备份-' + stampStr() + '.json',
+      JSON.stringify(store.exportState(), null, 2), 'application/json');
+    toast('备份已下载');
+  },
+  importJSON: function(file){
+    const fr = new FileReader();
+    fr.onload = function(){
+      try{
+        const data = JSON.parse(fr.result);
+        if(!data || typeof data !== 'object') throw new Error('bad');
+        if(!confirm('导入会用备份的内容覆盖当前全部数据，确定继续吗？')) return;
+        store.importState(data);
+        render();
+        toast('导入成功');
+      }catch(e){ toast('这个文件读不出来，换一个试试'); }
+    };
+    fr.readAsText(file);
+  }
+};
+/* ==================================================================
+   9. 事件
+   ================================================================== */
+document.addEventListener('click', function(e){
+  const t = e.target;
+  if(t.closest('[data-close]')){ closeModal(); return; }
+  const gotoBtn = t.closest('[data-goto]');
+  if(gotoBtn){ goto(gotoBtn.dataset.goto); return; }
+  /* 勾起「买到了」 */
+  const buy = t.closest('[data-buy]');
+  if(buy){ openBuyModal(buy.dataset.buy); return; }
+  const undo = t.closest('[data-undo]');
+  if(undo){
+    store.updateWant(undo.dataset.undo, { status:'todo', doneAt:'' });
+    render(); toast('放回待买清单'); return;
+  }
+  const delWant = t.closest('[data-delwant]');
+  if(delWant){
+    if(confirm('删掉这条采购需求？')){ store.removeWant(delWant.dataset.delwant); render(); toast('已删除'); }
+    return;
+  }
+  /* 库存加减与状态 */
+  const inc = t.closest('[data-inc]');
+  if(inc){
+    const it = store.getItem(inc.dataset.inc);
+    if(it){ store.updateItem(it._id, { qty: Number(it.qty||0) + 1 }); render(); }
+    return;
+  }
+  const dec = t.closest('[data-dec]');
+  if(dec){
+    const it = store.getItem(dec.dataset.dec);
+    if(it){
+      const cur = Number(it.qty||0);
+      if(cur <= 0){ toast('已经是 0 了，加一件或直接删掉'); return; }
+      const patch = { qty: cur - 1 };
+      if(it.track === 'state') patch.level = (cur-1) <= 0 ? '没了' : '不多了';
+      store.updateItem(it._id, patch);
+      store.addLog({ date: todayStr(), type:'取用', name: it.name, qty: 1, unit: it.unit||'' });
+      render();
+    }
+    return;
+  }
+  const lv = t.closest('[data-lv]');
+  if(lv){ store.updateItem(lv.dataset.lv, { level: lv.dataset.val }); render(); return; }
+  const editItem = t.closest('[data-edititem]');
+  if(editItem){ openItemModal(editItem.dataset.edititem); return; }
+  const delItem = t.closest('[data-delitem]');
+  if(delItem){
+    const it = store.getItem(delItem.dataset.delitem);
+    if(it && confirm('从库存里删掉「' + it.name + '」？历史流水会保留。')){
+      store.removeItem(it._id); render(); toast('已删除');
+    }
+    return;
+  }
+  const delLog = t.closest('[data-dellog]');
+  if(delLog){
+    if(confirm('删掉这条流水？')){ store.removeLog(delLog.dataset.dellog); render(); }
+    return;
+  }
+  /* 临期处理 */
+  const use = t.closest('[data-use]');
+  if(use){
+    const it = store.getItem(use.dataset.use);
+    if(it){
+      if(it.track === 'count'){
+        const left = Math.max(0, Number(it.qty||0) - 1);
+        store.updateItem(it._id, { qty: left });
+      }else{
+        store.updateItem(it._id, { level: '充足' });
+      }
+      store.addLog({ date: todayStr(), type:'取用', name: it.name, qty: 1, unit: it.unit||'' });
+      render(); toast('用掉一件');
+    }
+    return;
+  }
+  const waste = t.closest('[data-waste]');
+  if(waste){ openWasteModal(waste.dataset.waste); return; }
+  /* 库存页控件 */
+  const f = t.closest('[data-filter]');
+  if(f){ S().ui.stockFilter = f.dataset.filter; store.save(); el('stockBody').innerHTML = stockBody(); 
+    document.querySelectorAll('.chip[data-filter]').forEach(function(c){ c.classList.toggle('on', c.dataset.filter === S().ui.stockFilter); });
+    return; }
+  if(t.closest('[data-clearfilter]')){
+    S().ui.stockFilter = 'all'; S().ui.stockCat = ''; S().ui.stockPlace = ''; S().ui.stockQ = '';
+    store.save(); render(); return;
+  }
+  if(t.closest('[data-newitem]')){ openItemModal(null); return; }
+  if(t.closest('#addItemBtn')){ openItemModal(null); return; }
+  if(t.closest('#toggleDone')){ S().ui.wantsDone = !S().ui.wantsDone; store.save(); render(); return; }
+  if(t.closest('#toggleLogs')){ S().ui.stockSub = S().ui.stockSub === 'logs' ? 'items' : 'logs'; store.save(); render(); return; }
+  if(t.closest('#wantAddBtn')){ addWantFromForm(); return; }
+  /* 导出 */
+  const ex = t.closest('[data-export]');
+  if(ex){
+    const k = ex.dataset.export;
+    if(k === 'all') csv.exportAll(); else csv.exportOne(k);
+    return;
+  }
+  if(t.closest('#backupBtn')){ csv.exportJSON(); return; }
+  if(t.closest('#restoreBtn')){ el('fileInput').click(); return; }
+  if(t.closest('#saveSettings')){ saveSettings(); return; }
+  if(t.closest('#wipeBtn')){
+    if(confirm('确定清空全部数据吗？此操作无法撤销。建议先下载 JSON 备份。')){
+      if(confirm('再确认一次：所有采购需求、库存、流水都会被删掉。')){ store._s = store.defaults(); store.save(); render(); toast('已清空'); }
+    }
+    return;
+  }
+});
+document.addEventListener('submit', function(e){
+  e.preventDefault();
+  const t = e.target;
+  if(t.id === 'quickForm'){
+    const inp = el('quickInput');
+    const v = (inp.value||'').trim();
+    if(!v){ toast('写点什么再记'); return; }
+    store.addWant({ name:v, owner:S().members[0], urgent:'这周', qty:'', unit:'', cat:'', note:'' });
+    inp.value = '';
+    render(); inp.focus(); toast('记下了，去「要买什么」还能补充');
+    return;
+  }
+  if(t.id === 'wantQuick'){ addWantFromForm(); return; }
+  if(t.id === 'modalForm'){
+    if(!modalSubmit){ closeModal(); return; }
+    const need = Array.prototype.slice.call(t.querySelectorAll('[required]')).filter(function(i){
+      return !String(i.value||'').trim();
+    });
+    if(need.length){
+      toast('「' + (need[0].dataset.label || '必填项') + '」还不能空着');
+      try{ need[0].focus(); }catch(e2){}
+      return;
+    }
+    const data = formObj(t);
+    modalSubmit(data);
+    return;
+  }
+});
+document.addEventListener('input', function(e){
+  const t = e.target;
+  if(t.id === 'stockSearch'){
+    S().ui.stockQ = t.value; store.save();
+    el('stockBody').innerHTML = stockBody();
+    return;
+  }
+  if(t.id === 'setName'){
+    S().shopName = t.value || '暖心小屋';
+    store.save();
+    el('brandTitle').textContent = S().shopName;
+    return;
+  }
+  if(t.id === 'setTagline'){
+    S().tagline = t.value || DEFAULTS.tagline;
+    store.save();
+    el('brandSub').textContent = S().tagline;
+    return;
+  }
+});
+document.addEventListener('change', function(e){
+  const t = e.target;
+  if(t.id === 'fileInput'){
+    if(t.files && t.files[0]) csv.importJSON(t.files[0]);
+    t.value = '';
+    return;
+  }
+  if(t.id === 'stockCat'){ S().ui.stockCat = t.value; store.save(); el('stockBody').innerHTML = stockBody(); return; }
+  if(t.id === 'stockPlace'){ S().ui.stockPlace = t.value; store.save(); el('stockBody').innerHTML = stockBody(); return; }
+  if(t.id === 'trackSel'){
+    el('trackCount').style.display = t.value === 'count' ? 'block' : 'none';
+    el('trackState').style.display = t.value === 'state' ? 'block' : 'none';
+    return;
+  }
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && !el('modal').hidden) closeModal();
+});
+function addWantFromForm(){
+  const name = (el('wantInput').value||'').trim();
+  if(!name){ toast('先把想买的东西写上'); el('wantInput').focus(); return; }
+  store.addWant({
+    name: name,
+    owner: el('wantOwner').value,
+    qty: el('wantQty').value === '' ? '' : Number(el('wantQty').value),
+    unit: (el('wantUnit').value||'').trim(),
+    urgent: el('wantUrgent').value,
+    note: (el('wantNote').value||'').trim(),
+    cat: ''
+  });
+  ['wantInput','wantQty','wantUnit','wantNote'].forEach(function(id){ el(id).value = ''; });
+  render(); el('wantInput').focus();
+  toast('加进清单了');
+}
+function saveSettings(){
+  S().shopName = (el('setName').value||'').trim() || '暖心小屋';
+  S().tagline = (el('setTagline').value||'').trim() || DEFAULTS.tagline;
+  S().members = splitList(el('setMembers').value, S().members);
+  S().cats = splitList(el('setCats').value, S().cats);
+  S().places = splitList(el('setPlaces').value, S().places);
+  const f = Number(el('setFresh').value), sn = Number(el('setSoon').value);
+  S().freshDays = (f > 0 && f <= 60) ? f : 7;
+  S().soonDays = (sn > 0 && sn <= 365) ? sn : 30;
+  store.save(); render(); toast('设置保存好了');
+}
+function splitList(str, fallback){
+  const arr = String(str||'').split(/[，,、\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+  return arr.length ? arr.filter(function(v,i){ return arr.indexOf(v) === i; }) : fallback;
+}
+/* ==================================================================
+   10. 启动
+   ================================================================== */
+(function init(){
+  store.load();
+  /* 侧栏与底栏图标注入 */
+  document.querySelectorAll('.side-foot .glyph').forEach(function(g){ g.innerHTML = icon('settings',20); });
+  if(store.storageBroken){
+    setTimeout(function(){ toast('浏览器不让本地存数据（Safari 用 file:// 打开时常见），建议用 Chrome 打开'); }, 900);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
