@@ -988,9 +988,9 @@ function openLoginModal(){
   openModal({
     title: '登录 / 注册',
     sub: '登录后开启云端同步，多设备数据自动合并。',
-    body: '<form id="modalForm" class="form-grid'+
-      fText('username','用户名','','请输入用户名','text',true)+
-      fText('password','密码','','请输入密码','password',true)+
+    body: '<form id="modalForm" class="form-grid">'+
+      fText('username','用户名','','请输入用户名','text',true,'wide')+
+      fText('password','密码','','请输入密码','password',true,'wide')+
     '</form>',
     submitText: '登录',
     extra: '<button type="button" class="btn" id="registerBtn">注册新账号</button>',
