@@ -11,7 +11,8 @@
 |---|---|
 | `index.html` | 站点本体。单文件，含内联 favicon，双击即可运行 |
 | `favicon.svg` | favicon 源文件（同时以 data URI 内联在 `index.html` 的 `<head>`） |
-| `.cnb.yml` | CNB 流水线：推送 `main` 时把静态文件同步到国内节点主机 |
+| `.cnb.yml` | CNB 流水线：推送 `main`（或手动 `api_trigger`）时调用 `deploy/sync.sh` |
+| `deploy/sync.sh` | 部署脚本本体：准备 SSH → tar over ssh 同步 → 字节数校验 |
 | `deploy/caddy/site.caddy` | 托管该站点的 Caddy 站点块（服务器侧配置参考与幂等应用源） |
 
 ## 部署
