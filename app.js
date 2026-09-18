@@ -285,33 +285,35 @@ async function checkAuth(){
   authStore.set({ status:'anonymous' });
   return false;
 }
-async function login(username, password){
+async function login(email, password){
   if(!cloudAuth){ toast('登录服务未就绪'); return false; }
   try{
-    const res = await cloudAuth.signInWithPassword({ username, password });
+    const res = await cloudAuth.signInWithEmailAndPassword(email, password);
     if(res && res.uid){
-      authStore.set({ status:'authenticated', uid:res.uid, nickname:username, loginAt:new Date().toISOString() });
+      authStore.set({ status:'authenticated', uid:res.uid, nickname:email, loginAt:new Date().toISOString() });
       cloudSync.enabled = true;
       toast('登录成功');
       return true;
     }
   }catch(e){
-    toast('登录失败: ' + (e.message || '请检查用户名和密码'));
+    console.error('登录失败:', e);
+    toast('登录失败: ' + (e.message || '请检查邮箱和密码'));
     return false;
   }
 }
-async function register(username, password){
+async function register(email, password){
   if(!cloudAuth){ toast('注册服务未就绪'); return false; }
   try{
-    const res = await cloudAuth.signUp({ username, password });
+    const res = await cloudAuth.signUp(email, password);
     if(res && res.uid){
-      authStore.set({ status:'authenticated', uid:res.uid, nickname:username, loginAt:new Date().toISOString() });
+      authStore.set({ status:'authenticated', uid:res.uid, nickname:email, loginAt:new Date().toISOString() });
       cloudSync.enabled = true;
-      await createOrUpdateUser(res.uid, username);
+      await createOrUpdateUser(res.uid, email);
       toast('注册成功，已自动登录');
       return true;
     }
   }catch(e){
+    console.error('注册失败:', e);
     toast('注册失败: ' + (e.message || '请稍后重试'));
     return false;
   }
@@ -325,10 +327,10 @@ async function logout(){
   toast('已退出登录');
   render();
 }
-async function createOrUpdateUser(uid, username){
+async function createOrUpdateUser(uid, email){
   if(!cloudDB) return;
   try{
-    const userDoc = { uid, username, nickname:username, avatar:null, platform:'web', createdAt:new Date().toISOString(), lastLoginAt:new Date().toISOString() };
+    const userDoc = { uid, email, nickname:email, avatar:null, platform:'web', createdAt:new Date().toISOString(), lastLoginAt:new Date().toISOString() };
     await cloudDB.collection('users').add(userDoc);
   }catch(e){
     console.warn('创建用户记录失败:', e.message);
@@ -345,13 +347,13 @@ function openLoginModal(){
     title: '登录 / 注册',
     sub: '登录后开启云端同步，多设备数据自动合并。',
     body: '<form id="modalForm" class="form-grid">'+
-      fText('username','用户名','','请输入用户名','text',true,'wide')+
+      fText('email','邮箱','','请输入邮箱','email',true,'wide')+
       fText('password','密码','','请输入密码','password',true,'wide')+
     '</form>',
     submitText: '登录',
     extra: '<button type="button" class="btn" id="registerBtn">注册新账号</button>',
     onSubmit: async function(d){
-      const ok = await login(d.username, d.password);
+      const ok = await login(d.email, d.password);
       if(ok){ closeModal(); render(); }
     }
   });
@@ -361,8 +363,8 @@ function openLoginModal(){
       const form = document.getElementById('modalForm');
       if(!form) return;
       const data = formObj(form);
-      if(!data.username || !data.password){ toast('用户名和密码不能空'); return; }
-      const ok = await register(data.username, data.password);
+      if(!data.email || !data.password){ toast('邮箱和密码不能空'); return; }
+      const ok = await register(data.email, data.password);
       if(ok){ closeModal(); render(); }
     };
   }

@@ -415,8 +415,9 @@ svg.ic{stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
   padding:13px 24px;font-size:13.5px;font-weight:800;opacity:0;pointer-events:none;z-index:95;
   transition:all .32s var(--ease-bounce);max-width:86vw;text-align:center;
   box-shadow:0 6px 18px rgba(75,63,53,.24);
+  user-select:text;-webkit-user-select:text;
 }
-.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 /* ========================= 12b. 同步与登录状态 ========================= */
 .sync-status{
   display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
