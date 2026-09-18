@@ -16,7 +16,9 @@
   · 导出：每模块 CSV（带 UTF-8 BOM）/ 全量 CSV / 全量 JSON 备份与还原
   · 新增页签：在 JS 的 MODULES 表里加一项即可，无需改动其它代码
   · 电脑（>=768px）左侧导航；手机（<768px）底部四个大按钮
+  · 多设备同步：CloudBase（上海体验环境 trial-sh-d1gqznm4577d6a062）
 -->
+<script src="https://cdn.jsdelivr.net/npm/@cloudbase/js-sdk@1.6.0/dist/cloudbase-full.js"></script>
 <style>
 /* ==========================================================================
    暖心小屋 · 纸上童话（Cartoon Paper）设计系统
@@ -705,6 +707,7 @@ const store = {
   save(){
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this._s)); }
     catch(e){ toast('本地存不下更多数据了，建议先导出备份'); }
+    if(cloudSync.enabled) cloudSyncPush();
   },
   touch(){ this.save(); },
   /* 采购需求 */
@@ -733,6 +736,78 @@ const store = {
     this._s = base; this.save();
   }
 };
+/* ==================================================================
+   3.1 CloudBase 多设备同步
+   ================================================================== */
+const CLOUD_ENV = 'trial-sh-d1gqznm4577d6a062';
+const COLLECTION = 'home_items';
+let cloudApp = null;
+let cloudDB = null;
+let cloudSync = {
+  enabled: false,
+  lastSync: null,
+  syncing: false
+};
+function initCloudBase(){
+  try{
+    if(!window.cloudbase){ console.warn('CloudBase SDK 未加载'); return; }
+    cloudApp = cloudbase.init({ env: CLOUD_ENV });
+    cloudDB = cloudApp.database();
+    cloudSync.enabled = true;
+    console.log('CloudBase 初始化成功');
+  }catch(e){
+    console.warn('CloudBase 初始化失败:', e.message);
+  }
+}
+async function cloudSyncPush(){
+  if(!cloudSync.enabled || cloudSync.syncing) return;
+  cloudSync.syncing = true;
+  try{
+    const state = store.exportState();
+    const doc = {
+      _id: 'main',
+      data: state,
+      updatedAt: new Date().toISOString()
+    };
+    await cloudDB.collection(COLLECTION).doc('main').set(doc);
+    cloudSync.lastSync = new Date().toISOString();
+    console.log('数据已同步到云端');
+  }catch(e){
+    console.warn('同步失败:', e.message);
+  }finally{
+    cloudSync.syncing = false;
+  }
+}
+async function cloudSyncPull(){
+  if(!cloudSync.enabled || cloudSync.syncing) return null;
+  cloudSync.syncing = true;
+  try{
+    const res = await cloudDB.collection(COLLECTION).doc('main').get();
+    if(res.data && res.data.data){
+      cloudSync.lastSync = new Date().toISOString();
+      return res.data.data;
+    }
+    return null;
+  }catch(e){
+    console.warn('拉取失败:', e.message);
+    return null;
+  }finally{
+    cloudSync.syncing = false;
+  }
+}
+function cloudMergeRemote(remoteData){
+  if(!remoteData) return;
+  const localState = store.exportState();
+  const remote = remoteData;
+  const remoteTime = new Date(remote.updatedAt || remote.exportedAt || 0).getTime();
+  const localTime = new Date(localState.exportedAt || 0).getTime();
+  if(remoteTime > localTime){
+    store.importState(remote);
+    console.log('云端数据更新，已合并');
+    return true;
+  }
+  return false;
+}
 /* ==================================================================
    4. 工具
    ================================================================== */
@@ -1810,6 +1885,7 @@ function splitList(str, fallback){
    10. 启动
    ================================================================== */
 (function init(){
+  initCloudBase();
   store.load();
   /* 侧栏与底栏图标注入 */
   document.querySelectorAll('.side-foot .glyph').forEach(function(g){ g.innerHTML = icon('settings',20); });
@@ -1817,6 +1893,15 @@ function splitList(str, fallback){
     setTimeout(function(){ toast('浏览器不让本地存数据（Safari 用 file:// 打开时常见），建议用 Chrome 打开'); }, 900);
   }
   render();
+  /* 尝试拉取云端数据 */
+  if(cloudSync.enabled){
+    cloudSyncPull().then(function(remote){
+      if(cloudMergeRemote(remote)){
+        render();
+        toast('已同步云端数据');
+      }
+    });
+  }
 })();
 </script>
 </body>
