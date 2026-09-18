@@ -439,6 +439,19 @@ svg.ic{stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
   box-shadow:0 6px 18px rgba(75,63,53,.24);
 }
 .toast.on{opacity:1;transform:translate(-50%,0)}
+/* ========================= 12b. 同步与登录状态 ========================= */
+.sync-status{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
+  border-radius:var(--r-pill);font-size:12px;background:var(--bg-paper-2);
+}
+.sync-status.synced{color:var(--s-ok-ink);background:var(--s-ok-bg)}
+.sync-status.syncing{color:var(--s-warn-ink);background:var(--s-warn-bg)}
+.sync-status.error{color:var(--s-danger-ink);background:var(--s-danger-bg)}
+.auth-badge{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
+  border-radius:var(--r-pill);font-size:12px;background:var(--c-mint);color:var(--tx-1);
+}
+.hint.sm{font-size:11.5px}
 /* ========================= 13. 覆盖与修正 ========================= */
 /* 涂鸦层：绝对定位铺满卡纸，永远压在内容下方（不干扰点击与阅读） */
 .main>*:not(.doodles){position:relative;z-index:1}
@@ -647,7 +660,13 @@ const ICONS = {
   trash:   '<path d="M5 7.4h14"/><path d="M9.4 7.4V5.5h5.2v1.9"/><path d="M7 7.4 8 19.4h8l1-12"/>',
   undo:    '<path d="M4.6 9.4h9.2a4.6 4.6 0 1 1 0 9.2H8.6"/><path d="M8.2 5.4 4 9.4l4.2 4"/>',
   cal:     '<rect x="4" y="6.4" width="16" height="13.6" rx="2.6"/><path d="M4 10.6h16M8.6 4.4v3.6M15.4 4.4v3.6"/>',
-  spark:   '<path d="M12 4.5l1.7 4.6 4.6 1.7-4.6 1.7L12 17.1l-1.7-4.6L5.7 10.8l4.6-1.7z"/>'
+  spark:   '<path d="M12 4.5l1.7 4.6 4.6 1.7-4.6 1.7L12 17.1l-1.7-4.6L5.7 10.8l4.6-1.7z"/>',
+  my:      '<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>',
+  user:    '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>',
+  sync:    '<path d="M4 12a8 8 0 0 1 13.7-5.7L20 8M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-13.7 5.7L4 16M4 20v-4h4"/>',
+  link:    '<path d="M9 15l6-6"/><path d="M10.5 6.5l1-1a3.5 3.5 0 0 1 5 5l-1 1"/><path d="M13.5 17.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/>',
+  download:'<path d="M12 4v10M8 10l4 4 4-4"/><path d="M4 18h16"/>',
+  logout:  '<path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M18 14l4-2-4-2"/><path d="M22 12h-8"/>'
 };
 function icon(name,size){
   const s = size||20;
@@ -662,7 +681,8 @@ const MODULES = [
   { id:'today',  name:'今日',     glyph:'today',  sub:'家里今天要办的事' },
   { id:'wants',  name:'要买什么', glyph:'wants',  sub:'想买的、家人要的，先记下来' },
   { id:'stock',  name:'家里有啥', glyph:'stock',  sub:'库存台账与买回记录' },
-  { id:'expire', name:'快过期了', glyph:'expire', sub:'按到期日分档，该用就用该扔就扔' }
+  { id:'expire', name:'快过期了', glyph:'expire', sub:'按到期日分档，该用就用该扔就扔' },
+  { id:'my',     name:'我的',     glyph:'my',     sub:'登录与同步状态' }
 ];
 /* ==================================================================
    3. 数据层（唯一出口，业务代码里不出现裸 localStorage）
@@ -707,7 +727,7 @@ const store = {
   save(){
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this._s)); }
     catch(e){ toast('本地存不下更多数据了，建议先导出备份'); }
-    if(cloudSync.enabled) cloudSyncPush();
+    if(cloudSync.enabled && authStore.isAuthenticated()) cloudSyncPush();
   },
   touch(){ this.save(); },
   /* 采购需求 */
@@ -746,31 +766,78 @@ let cloudDB = null;
 let cloudSync = {
   enabled: false,
   lastSync: null,
-  syncing: false
+  syncing: false,
+  pending: 0,
+  queueTimer: null,
+  lastPushTime: 0,
+  throttleMs: 5000
 };
 function initCloudBase(){
   try{
     if(!window.cloudbase){ console.warn('CloudBase SDK 未加载'); return; }
     cloudApp = cloudbase.init({ env: CLOUD_ENV });
     cloudDB = cloudApp.database();
-    cloudSync.enabled = true;
+    initCloudAuth();
     console.log('CloudBase 初始化成功');
   }catch(e){
     console.warn('CloudBase 初始化失败:', e.message);
   }
 }
+function syncStatus(){
+  if(!cloudSync.enabled) return { mode:'off', text:'未开启同步' };
+  if(cloudSync.syncing) return { mode:'syncing', text:'同步中…' };
+  if(cloudSync.pending > 0) return { mode:'pending', text:'待同步 '+cloudSync.pending+' 条' };
+  if(cloudSync.lastSync) return { mode:'synced', text:'已同步' };
+  return { mode:'idle', text:'等待同步' };
+}
+function mergeData(local, remote){
+  const result = JSON.parse(JSON.stringify(local));
+  const localTime = new Date(local.updatedAt || local.exportedAt || 0).getTime();
+  const remoteTime = new Date(remote.updatedAt || remote.exportedAt || 0).getTime();
+  const useRemote = remoteTime >= localTime;
+  for(const key in remote){
+    if(!Object.prototype.hasOwnProperty.call(remote, key)) continue;
+    const localVal = local[key];
+    const remoteVal = remote[key];
+    if(remoteVal == null && localVal != null){
+      result[key] = localVal;
+    }else if(localVal == null && remoteVal != null){
+      result[key] = remoteVal;
+    }else if(useRemote){
+      result[key] = remoteVal;
+    }
+  }
+  return result;
+}
 async function cloudSyncPush(){
   if(!cloudSync.enabled || cloudSync.syncing) return;
+  if(!authStore.isAuthenticated()) return;
+  const now = Date.now();
+  if(now - cloudSync.lastPushTime < cloudSync.throttleMs){
+    cloudSync.pending++;
+    if(!cloudSync.queueTimer){
+      cloudSync.queueTimer = setTimeout(function(){
+        cloudSync.queueTimer = null;
+        cloudSync.pending = 0;
+        cloudSyncPush();
+      }, cloudSync.throttleMs);
+    }
+    return;
+  }
+  cloudSync.lastPushTime = now;
   cloudSync.syncing = true;
   try{
     const state = store.exportState();
+    const uid = authStore.a.uid;
     const doc = {
-      _id: 'main',
+      _id: uid,
+      uid: uid,
       data: state,
       updatedAt: new Date().toISOString()
     };
-    await cloudDB.collection(COLLECTION).doc('main').set(doc);
+    await cloudDB.collection(COLLECTION).doc(uid).set(doc);
     cloudSync.lastSync = new Date().toISOString();
+    authStore.set({ lastSyncAt: cloudSync.lastSync });
     console.log('数据已同步到云端');
   }catch(e){
     console.warn('同步失败:', e.message);
@@ -780,12 +847,15 @@ async function cloudSyncPush(){
 }
 async function cloudSyncPull(){
   if(!cloudSync.enabled || cloudSync.syncing) return null;
+  if(!authStore.isAuthenticated()) return null;
   cloudSync.syncing = true;
   try{
-    const res = await cloudDB.collection(COLLECTION).doc('main').get();
+    const uid = authStore.a.uid;
+    const res = await cloudDB.collection(COLLECTION).doc(uid).get();
     if(res.data && res.data.data){
       cloudSync.lastSync = new Date().toISOString();
-      return res.data.data;
+      authStore.set({ lastSyncAt: cloudSync.lastSync });
+      return res.data;
     }
     return null;
   }catch(e){
@@ -795,22 +865,152 @@ async function cloudSyncPull(){
     cloudSync.syncing = false;
   }
 }
-function cloudMergeRemote(remoteData){
-  if(!remoteData) return;
+function cloudMergeRemote(remoteDoc){
+  if(!remoteDoc || !remoteDoc.data) return false;
   const localState = store.exportState();
-  const remote = remoteData;
-  const remoteTime = new Date(remote.updatedAt || remote.exportedAt || 0).getTime();
+  const remoteData = remoteDoc.data;
+  const remoteTime = new Date(remoteDoc.updatedAt || remoteData.exportedAt || 0).getTime();
   const localTime = new Date(localState.exportedAt || 0).getTime();
   if(remoteTime > localTime){
-    store.importState(remote);
+    store.importState(remoteData);
     console.log('云端数据更新，已合并');
+    return true;
+  }
+  const merged = mergeData(localState, remoteData);
+  if(JSON.stringify(merged) !== JSON.stringify(localState)){
+    store.importState(merged);
+    console.log('数据已字段级合并');
     return true;
   }
   return false;
 }
 /* ==================================================================
-   4. 工具
+   3.2 用户认证模块（hw_auth 独立于业务数据）
    ================================================================== */
+const AUTH_KEY = 'hw-auth.v1';
+const authStore = {
+  _a: null,
+  defaults(){
+    return { status:'anonymous', uid:null, nickname:null, avatar:null, loginAt:null, lastSyncAt:null, open_id:null };
+  },
+  get a(){ if(!this._a) this.load(); return this._a; },
+  load(){
+    let raw = null;
+    try{ raw = localStorage.getItem(AUTH_KEY); }catch(e){}
+    let data = {};
+    if(raw){ try{ data = JSON.parse(raw) || {}; }catch(e){ data = {}; } }
+    this._a = Object.assign(this.defaults(), data);
+    return this._a;
+  },
+  save(){
+    try{ localStorage.setItem(AUTH_KEY, JSON.stringify(this._a)); }catch(e){}
+  },
+  set(patch){ Object.assign(this._a, patch); this.save(); },
+  isAuthenticated(){ return this._a && this._a.status === 'authenticated'; }
+};
+let cloudAuth = null;
+function initCloudAuth(){
+  try{
+    if(!cloudApp) return;
+    cloudAuth = cloudApp.auth({ persistence: 'local' });
+  }catch(e){
+    console.warn('CloudBase Auth 初始化失败:', e.message);
+  }
+}
+async function checkAuth(){
+  if(!cloudAuth) return false;
+  try{
+    const session = await cloudAuth.getSession();
+    if(session && session.uid){
+      authStore.set({ status:'authenticated', uid:session.uid, loginAt:new Date().toISOString() });
+      return true;
+    }
+  }catch(e){}
+  authStore.set({ status:'anonymous' });
+  return false;
+}
+async function login(username, password){
+  if(!cloudAuth){ toast('登录服务未就绪'); return false; }
+  try{
+    const res = await cloudAuth.signInWithPassword({ username, password });
+    if(res && res.uid){
+      authStore.set({ status:'authenticated', uid:res.uid, nickname:username, loginAt:new Date().toISOString() });
+      cloudSync.enabled = true;
+      toast('登录成功');
+      return true;
+    }
+  }catch(e){
+    toast('登录失败: ' + (e.message || '请检查用户名和密码'));
+    return false;
+  }
+}
+async function register(username, password){
+  if(!cloudAuth){ toast('注册服务未就绪'); return false; }
+  try{
+    const res = await cloudAuth.signUp({ username, password });
+    if(res && res.uid){
+      authStore.set({ status:'authenticated', uid:res.uid, nickname:username, loginAt:new Date().toISOString() });
+      cloudSync.enabled = true;
+      await createOrUpdateUser(res.uid, username);
+      toast('注册成功，已自动登录');
+      return true;
+    }
+  }catch(e){
+    toast('注册失败: ' + (e.message || '请稍后重试'));
+    return false;
+  }
+}
+async function logout(){
+  if(cloudAuth){
+    try{ await cloudAuth.signOut(); }catch(e){}
+  }
+  authStore.set(authStore.defaults());
+  cloudSync.enabled = false;
+  toast('已退出登录');
+  render();
+}
+async function createOrUpdateUser(uid, username){
+  if(!cloudDB) return;
+  try{
+    const userDoc = { uid, username, nickname:username, avatar:null, platform:'web', createdAt:new Date().toISOString(), lastLoginAt:new Date().toISOString() };
+    await cloudDB.collection('users').add(userDoc);
+  }catch(e){
+    console.warn('创建用户记录失败:', e.message);
+  }
+}
+async function bindOpenId(){
+  toast('绑定功能将在小程序端上线后开放');
+}
+async function mergeAccounts(){
+  toast('合并功能将在小程序端上线后开放');
+}
+function openLoginModal(){
+  openModal({
+    title: '登录 / 注册',
+    sub: '登录后开启云端同步，多设备数据自动合并。',
+    body: '<form id="modalForm" class="form-grid'+
+      fText('username','用户名','','请输入用户名','text',true)+
+      fText('password','密码','','请输入密码','password',true)+
+    '</form>',
+    submitText: '登录',
+    extra: '<button type="button" class="btn" id="registerBtn">注册新账号</button>',
+    onSubmit: async function(d){
+      const ok = await login(d.username, d.password);
+      if(ok){ closeModal(); render(); }
+    }
+  });
+  const regBtn = el('registerBtn');
+  if(regBtn){
+    regBtn.onclick = async function(){
+      const form = document.getElementById('modalForm');
+      if(!form) return;
+      const data = formObj(form);
+      if(!data.username || !data.password){ toast('用户名和密码不能空'); return; }
+      const ok = await register(data.username, data.password);
+      if(ok){ closeModal(); render(); }
+    };
+  }
+}
 const el = id => document.getElementById(id);
 const S  = () => store.s;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -1234,6 +1434,87 @@ function expireRow(it){
     '</div>'+
   '</div>';
 }
+/* ---------- 我的 ---------- */
+function viewMy(){
+  const a = authStore.a;
+  let h = '';
+  if(a.status !== 'authenticated'){
+    h += '<div class="card">'+
+      '<h3><span class="h-l">'+icon('user',18)+' 登录状态</span></h3>'+
+      '<div class="hint">未登录，数据仅保存在本机浏览器，换设备需手动导出/导入。</div>'+
+      '<div class="modal-foot" style="margin-top:14px">'+
+        '<button class="btn primary" id="loginBtn">'+icon('user',18)+' 登录 / 注册</button>'+
+      '</div>'+
+      '<div class="hint sm" style="margin-top:8px; color:var(--s-warn-ink)">'+
+        '建议定期下载 JSON 备份，防止数据丢失'+
+      '</div>'+
+    '</div>';
+    h += '<div class="card">'+
+      '<h3><span class="h-l">'+icon('download',18)+' 本地功能</span></h3>'+
+      '<div class="hint">未登录时可使用以下功能：</div>'+
+      '<div class="chips" style="margin-top:12px">'+
+        '<button class="btn sm" data-export="wants">导出 采购需求 CSV</button>'+
+        '<button class="btn sm" data-export="items">导出 库存 CSV</button>'+
+        '<button class="btn sm" data-export="logs">导出 流水 CSV</button>'+
+        '<button class="btn sm" data-export="all">导出 全部合并 CSV</button>'+
+      '</div>'+
+      '<div class="divider"></div>'+
+      '<div class="chips">'+
+        '<button class="btn sm primary" id="backupBtn">'+icon('download',16)+' 下载 JSON 备份</button>'+
+        '<button class="btn sm" id="restoreBtn">导入备份还原</button>'+
+        '<input type="file" id="fileInput" accept=".json,application/json" hidden>'+
+      '</div>'+
+    '</div>';
+    h += '<div class="card">'+
+      '<h3><span class="h-l">'+icon('stock',18)+' 数据概览</span></h3>'+
+      '<div class="stat-line"><span class="k">采购需求</span><span class="v">'+S().wants.length+' 条</span></div>'+
+      '<div class="stat-line"><span class="k">库存物品</span><span class="v">'+S().items.length+' 件</span></div>'+
+      '<div class="stat-line"><span class="k">出入库流水</span><span class="v">'+S().logs.length+' 条</span></div>'+
+    '</div>';
+  }else{
+    h += '<div class="card">'+
+      '<h3><span class="h-l">'+icon('user',18)+' 登录信息</span></h3>'+
+      '<div class="stat-line"><span class="k">昵称</span><span class="v">'+esc(a.nickname || '匿名用户')+'</span></div>'+
+      '<div class="stat-line"><span class="k">登录时间</span><span class="v">'+esc(a.loginAt || '—')+'</span></div>'+
+      '<div class="stat-line"><span class="k">上次同步</span><span class="v">'+esc(a.lastSyncAt || '尚未同步')+'</span></div>'+
+      '<div class="modal-foot" style="margin-top:14px">'+
+        '<button class="btn" id="logoutBtn">'+icon('logout',18)+' 退出登录</button>'+
+      '</div>'+
+    '</div>';
+    h += '<div class="card">'+
+      '<h3><span class="h-l">'+icon('sync',18)+' 同步状态</span></h3>'+
+      '<div class="stat-line"><span class="k">同步模式</span><span class="v">自动同步（保存时触发）</span></div>'+
+      '<div class="stat-line"><span class="k">冲突策略</span><span class="v">时间戳优先</span></div>'+
+      '<div class="chips" style="margin-top:14px">'+
+        '<button class="btn sm" id="syncNowBtn">'+icon('sync',16)+' 立即同步</button>'+
+      '</div>'+
+    '</div>';
+    h += '<div class="card">'+
+      '<h3><span class="h-l">'+icon('link',18)+' 跨端同步</span></h3>'+
+      '<div class="stat-line"><span class="k">小程序绑定</span><span class="v">'+(a.open_id ? '已绑定' : '未绑定')+'</span></div>'+
+      (a.open_id ? '<div class="hint sm">已绑定小程序，数据自动同步</div>' : '<div class="modal-foot" style="margin-top:10px"><button class="btn sm" id="bindOpenIdBtn">绑定小程序</button></div>')+
+      '<div class="divider" style="margin:10px 0"></div>'+
+      '<button class="btn sm" id="mergeAccountBtn">合并账号</button>'+
+      '<div class="hint sm" style="margin-top:6px">若同一用户在两端有独立账号，可合并数据</div>'+
+    '</div>';
+    h += '<div class="card">'+
+      '<h3><span class="h-l">'+icon('download',18)+' 数据管理</span></h3>'+
+      '<div class="chips">'+
+        '<button class="btn sm" data-export="wants">导出 采购需求 CSV</button>'+
+        '<button class="btn sm" data-export="items">导出 库存 CSV</button>'+
+        '<button class="btn sm" data-export="logs">导出 流水 CSV</button>'+
+        '<button class="btn sm" data-export="all">导出 全部合并 CSV</button>'+
+      '</div>'+
+      '<div class="divider"></div>'+
+      '<div class="chips">'+
+        '<button class="btn sm primary" id="backupBtn">'+icon('download',16)+' 下载 JSON 备份</button>'+
+        '<button class="btn sm" id="restoreBtn">导入备份还原</button>'+
+        '<input type="file" id="fileInput" accept=".json,application/json" hidden>'+
+      '</div>'+
+    '</div>';
+  }
+  return h;
+}
 /* ---------- 设置 ---------- */
 function viewSettings(){
   const s = S();
@@ -1346,12 +1627,13 @@ function render(){
     const m = MODULES.filter(function(x){ return x.id === tab; })[0] || MODULES[0];
     el('pageTitle').textContent = m.name;
     el('pageSub').textContent = m.sub;
-    el('pageActions').innerHTML = m.id === 'today' ? '' : '<button class="btn sm" data-export="'+exportKeyOf(m.id)+'">导出 CSV</button>';
+    el('pageActions').innerHTML = (m.id === 'today' || m.id === 'my') ? '' : '<button class="btn sm" data-export="'+exportKeyOf(m.id)+'">导出 CSV</button>';
     let body = '';
     if(m.id === 'today')  body = viewToday();
     if(m.id === 'wants')  body = viewWants();
     if(m.id === 'stock')  body = viewStock();
     if(m.id === 'expire') body = viewExpire();
+    if(m.id === 'my')     body = viewMy();
     el('viewRoot').innerHTML = body;
   }
   view.scrollTop = keptTop;
@@ -1783,6 +2065,11 @@ document.addEventListener('click', function(e){
     }
     return;
   }
+  if(t.closest('#loginBtn')){ openLoginModal(); return; }
+  if(t.closest('#logoutBtn')){ logout(); return; }
+  if(t.closest('#syncNowBtn')){ cloudSyncPush(); toast('同步中…'); return; }
+  if(t.closest('#bindOpenIdBtn')){ bindOpenId(); return; }
+  if(t.closest('#mergeAccountBtn')){ mergeAccounts(); return; }
 });
 document.addEventListener('submit', function(e){
   e.preventDefault();
@@ -1886,17 +2173,16 @@ function splitList(str, fallback){
    ================================================================== */
 (function init(){
   initCloudBase();
+  authStore.load();
   store.load();
-  /* 侧栏与底栏图标注入 */
   document.querySelectorAll('.side-foot .glyph').forEach(function(g){ g.innerHTML = icon('settings',20); });
   if(store.storageBroken){
     setTimeout(function(){ toast('浏览器不让本地存数据（Safari 用 file:// 打开时常见），建议用 Chrome 打开'); }, 900);
   }
   render();
-  /* 尝试拉取云端数据 */
-  if(cloudSync.enabled){
-    cloudSyncPull().then(function(remote){
-      if(cloudMergeRemote(remote)){
+  if(cloudSync.enabled && authStore.isAuthenticated()){
+    cloudSyncPull().then(function(remoteDoc){
+      if(cloudMergeRemote(remoteDoc)){
         render();
         toast('已同步云端数据');
       }
