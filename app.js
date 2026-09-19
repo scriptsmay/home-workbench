@@ -116,6 +116,7 @@ const store = {
    3.1 CloudBase 多设备同步
    ================================================================== */
 const CLOUD_ENV = 'trial-sh-d1gqznm4577d6a062';
+const CLOUD_REGION = 'ap-shanghai';
 const COLLECTION = 'home_items';
 let cloudApp = null;
 let cloudDB = null;
@@ -130,8 +131,14 @@ let cloudSync = {
 };
 function initCloudBase(){
   try{
+    if(location.protocol === 'file:'){
+      // file:// 打开时 origin 为 null，CloudBase 安全域名机制无法覆盖，云功能整体不可用；本地功能不受影响
+      console.info('[cloud] file:// 模式，跳过云初始化');
+      return;
+    }
     if(!window.cloudbase){ console.warn('CloudBase SDK 未加载'); return; }
-    cloudApp = cloudbase.init({ env: CLOUD_ENV });
+    // 密码登录与数据库 CRUD 实测仅需 env + region（accessKey/Publishable Key 非必需）
+    cloudApp = cloudbase.init({ env: CLOUD_ENV, region: CLOUD_REGION });
     cloudDB = cloudApp.database();
     initCloudAuth();
     console.log('CloudBase 初始化成功');
@@ -268,53 +275,64 @@ let cloudAuth = null;
 function initCloudAuth(){
   try{
     if(!cloudApp) return;
-    cloudAuth = cloudApp.auth({ persistence: 'local' });
+    cloudAuth = cloudApp.auth;   // v3：auth 是实例属性，不是函数调用
   }catch(e){
     console.warn('CloudBase Auth 初始化失败:', e.message);
   }
 }
+function authErrText(err){
+  const map = {
+    invalid_username_or_password: '用户名或密码不正确',
+    invalid_password:             '用户名或密码不正确',
+    not_found:                    '账号不存在',
+    already_exists:               '该用户名已被注册',
+    password_too_weak:            '密码强度不足',
+    unauthenticated:              '登录状态已失效，请重新登录',
+    permission_denied:            '当前域名未获授权',
+    resource_exhausted:           '操作过于频繁，请稍后再试',
+    captcha_required:             '需要人机验证，请稍后再试',
+    missing_required_param:       '请完整填写用户名和密码',
+    invalid_argument:             '参数格式错误',
+    unreachable:                  '网络异常，请检查网络后重试'
+  };
+  const code = err && (err.code || err.errorCode);
+  return map[code] || (err && err.message) || '未知错误，请稍后再试';
+}
 async function checkAuth(){
   if(!cloudAuth) return false;
   try{
-    const session = await cloudAuth.getSession();
-    if(session && session.uid){
-      authStore.set({ status:'authenticated', uid:session.uid, loginAt:new Date().toISOString() });
+    const res = await cloudAuth.getSession();
+    const session = res && res.data && res.data.session;
+    if(session && session.user){
+      const u = session.user;
+      authStore.set({ status:'authenticated', uid:u.id || u.uid, loginAt:authStore.a.loginAt || new Date().toISOString() });
       return true;
     }
-  }catch(e){}
+  }catch(e){
+    console.warn('会话恢复异常:', e && e.message);
+  }
   authStore.set({ status:'anonymous' });
   return false;
 }
-async function login(email, password){
-  if(!cloudAuth){ toast('登录服务未就绪'); return false; }
+async function login(username, password){
+  if(!cloudAuth){ toast('登录服务未就绪（file:// 打开时云功能不可用）'); return false; }
   try{
-    const res = await cloudAuth.signInWithEmailAndPassword(email, password);
-    if(res && res.uid){
-      authStore.set({ status:'authenticated', uid:res.uid, nickname:email, loginAt:new Date().toISOString() });
-      cloudSync.enabled = true;
-      toast('登录成功');
-      return true;
+    const res = await cloudAuth.signInWithPassword({ username: username, password: password });
+    if(res && res.error){
+      console.warn('登录失败:', res.error.code, res.error.message);
+      toast('登录失败: ' + authErrText(res.error));
+      return false;
     }
+    const u = (res && res.data && res.data.user) || {};
+    const realUid = u.id || u.uid;
+    authStore.set({ status:'authenticated', uid:realUid, nickname:username, loginAt:new Date().toISOString() });
+    cloudSync.enabled = true;
+    await ensureUserDoc(realUid, username);
+    toast('登录成功');
+    return true;
   }catch(e){
     console.error('登录失败:', e);
-    toast('登录失败: ' + (e.message || '请检查邮箱和密码'));
-    return false;
-  }
-}
-async function register(email, password){
-  if(!cloudAuth){ toast('注册服务未就绪'); return false; }
-  try{
-    const res = await cloudAuth.signUp(email, password);
-    if(res && res.uid){
-      authStore.set({ status:'authenticated', uid:res.uid, nickname:email, loginAt:new Date().toISOString() });
-      cloudSync.enabled = true;
-      await createOrUpdateUser(res.uid, email);
-      toast('注册成功，已自动登录');
-      return true;
-    }
-  }catch(e){
-    console.error('注册失败:', e);
-    toast('注册失败: ' + (e.message || '请稍后重试'));
+    toast('登录失败: ' + (e && e.message || '请检查用户名和密码'));
     return false;
   }
 }
@@ -327,13 +345,15 @@ async function logout(){
   toast('已退出登录');
   render();
 }
-async function createOrUpdateUser(uid, email){
+async function ensureUserDoc(uid, username){
   if(!cloudDB) return;
   try{
-    const userDoc = { uid, email, nickname:email, avatar:null, platform:'web', createdAt:new Date().toISOString(), lastLoginAt:new Date().toISOString() };
+    const found = await cloudDB.collection('users').where({ uid: uid }).get();
+    if(found && found.data && found.data.length) return;
+    const userDoc = { uid: uid, username: username, nickname: username, avatar: null, platform: 'web', createdAt: new Date().toISOString(), lastLoginAt: new Date().toISOString() };
     await cloudDB.collection('users').add(userDoc);
   }catch(e){
-    console.warn('创建用户记录失败:', e.message);
+    console.warn('记录用户信息失败:', e && e.message);
   }
 }
 async function bindOpenId(){
@@ -343,31 +363,24 @@ async function mergeAccounts(){
   toast('合并功能将在小程序端上线后开放');
 }
 function openLoginModal(){
+  if(location.protocol === 'file:'){
+    toast('云同步需通过网站访问使用，本地功能不受影响');
+    return;
+  }
+  if(!cloudAuth){ toast('登录服务未就绪'); return; }
   openModal({
-    title: '登录 / 注册',
-    sub: '登录后开启云端同步，多设备数据自动合并。',
+    title: '登录',
+    sub: '账号由管理员开通。登录后开启云端同步，多设备数据自动合并。',
     body: '<form id="modalForm" class="form-grid">'+
-      fText('email','邮箱','','请输入邮箱','email',true,'wide')+
+      fText('username','用户名','','请输入用户名','text',true,'wide')+
       fText('password','密码','','请输入密码','password',true,'wide')+
     '</form>',
     submitText: '登录',
-    extra: '<button type="button" class="btn" id="registerBtn">注册新账号</button>',
     onSubmit: async function(d){
-      const ok = await login(d.email, d.password);
+      const ok = await login(d.username, d.password);
       if(ok){ closeModal(); render(); }
     }
   });
-  const regBtn = el('registerBtn');
-  if(regBtn){
-    regBtn.onclick = async function(){
-      const form = document.getElementById('modalForm');
-      if(!form) return;
-      const data = formObj(form);
-      if(!data.email || !data.password){ toast('邮箱和密码不能空'); return; }
-      const ok = await register(data.email, data.password);
-      if(ok){ closeModal(); render(); }
-    };
-  }
 }
 const el = id => document.getElementById(id);
 const S  = () => store.s;
@@ -1538,12 +1551,15 @@ function splitList(str, fallback){
     setTimeout(function(){ toast('浏览器不让本地存数据（Safari 用 file:// 打开时常见），建议用 Chrome 打开'); }, 900);
   }
   render();
-  if(cloudSync.enabled && authStore.isAuthenticated()){
+  // 刷新后用 v3 getSession 恢复登录态，恢复成功才开同步（cloudSync.enabled 是内存变量，重启必为 false）
+  checkAuth().then(function(authed){
+    if(!authed) return;
+    cloudSync.enabled = true;
     cloudSyncPull().then(function(remoteDoc){
       if(cloudMergeRemote(remoteDoc)){
         render();
         toast('已同步云端数据');
       }
     });
-  }
+  });
 })();
