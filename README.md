@@ -26,10 +26,10 @@ HTTP 端点（`API_BASE`），不接入任何厂商 SDK。
   由该机 Caddy `file_server` 托管。主机地址、登录用户、目标目录、SSH 私钥全部来自
   CNB **密钥仓库**，通过流水线 `imports` 注入 —— **本仓库不硬编码任何主机信息**。
 - **海外镜像（备）**：GitHub 仓库 → Cloudflare Pages 项目 `home-workbench`
-  （域名 `home-workbench.pages.dev` 与自定义域）。当前为 **Direct Upload** 模式，
-  未绑定 Git 集成，推送不会自动部署，需手动发布：
-  `wrangler pages deploy frontend --project-name home-workbench`；
-  绑定 Git 集成（Production branch = `main`，Output directory = `frontend`）后即可推送即上线。
+  （域名 `home-workbench.pages.dev` 与自定义域），**已绑定 Git 集成**：
+  推送 `main` 即自动构建部署（Production branch `main`、无构建命令、
+  Output directory = `frontend`）。排障或需要脱离 Git 手动发布时：
+  `wrangler pages deploy frontend --project-name home-workbench`。
 - **同步后端**：CloudBase 云函数 `hwSyncApi`（独立于静态托管，见「云端环境」）。
 
 > 历史勘误：本版曾长期在文档里写作「GitHub 接入 Vercel，推送即部署」，与实际不符
