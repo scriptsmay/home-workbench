@@ -206,6 +206,8 @@ svg.ic{stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .btn.ghost{box-shadow:none;border-style:dashed;background:transparent}
 .btn.sm{min-height:40px;padding:0 16px;font-size:13px}
 .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn .ic.btn-spin{animation:btnspin .8s linear infinite}
+@keyframes btnspin{to{transform:rotate(360deg)}}
 .iconbtn{
   width:46px;height:46px;flex:none;display:grid;place-items:center;border-radius:var(--r-pill);
   border:2px solid var(--ink);background:var(--bg-paper);box-shadow:var(--sh-btn);

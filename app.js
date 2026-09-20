@@ -433,11 +433,14 @@ async function checkAuth() {
   }
   return false;
 }
+let loggingIn = false;
 async function login(username, password) {
   if (!CLOUD_ENABLED) {
     toast('云同步需通过网站访问使用，本地功能不受影响');
     return false;
   }
+  if (loggingIn) return false;
+  loggingIn = true;
   try {
     const res = await fetch(API_BASE + '/auth/login', {
       method: 'POST',
@@ -477,6 +480,8 @@ async function login(username, password) {
   } catch (e) {
     toast('网络异常，请检查网络后重试');
     return false;
+  } finally {
+    loggingIn = false;
   }
 }
 function logout() {
@@ -2731,7 +2736,7 @@ document.addEventListener('click', function (e) {
     return;
   }
 });
-document.addEventListener('submit', function (e) {
+document.addEventListener('submit', async function (e) {
   e.preventDefault();
   const t = e.target;
   if (t.id === 'quickForm') {
@@ -2778,7 +2783,29 @@ document.addEventListener('submit', function (e) {
       return;
     }
     const data = formObj(t);
-    modalSubmit(data);
+    if (!modalSubmit) return;
+    const r = modalSubmit(data);
+    if (r && typeof r.then === 'function') {
+      const footBtn = el('modalFoot').querySelector('.btn.primary');
+      const spin =
+        '<svg class="ic btn-spin" viewBox="0 0 24 24" width="16" height="16" fill="none" ' +
+        'stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true">' +
+        (ICONS.sync || '') +
+        '</svg>';
+      const old = footBtn ? footBtn.innerHTML : '';
+      if (footBtn) {
+        footBtn.disabled = true;
+        footBtn.innerHTML = spin + '处理中…';
+      }
+      try {
+        await r;
+      } finally {
+        if (footBtn && el('modal').hidden === false) {
+          footBtn.disabled = false;
+          footBtn.innerHTML = old;
+        }
+      }
+    }
     return;
   }
 });
