@@ -214,13 +214,12 @@ const store = {
   },
 };
 /* ==================================================================
-   3.1 CloudBase 多设备同步
+   3.1 云同步通道（CloudBase 云函数 HTTP API，v0.4 弃用 jssdk）
    ================================================================== */
-const CLOUD_ENV = 'trial-sh-d1gqznm4577d6a062';
-const CLOUD_REGION = 'ap-shanghai';
-const COLLECTION = 'home_items';
-let cloudApp = null;
-let cloudDB = null;
+const API_BASE =
+  'https://trial-sh-d1gqznm4577d6a062-1251520283.ap-shanghai.app.tcloudbase.com/api';
+// file:// 打开时 origin 为 null，跨域请求无合法 CORS，云功能整体不可用；本地功能不受影响
+const CLOUD_ENABLED = location.protocol !== 'file:';
 let cloudSync = {
   enabled: false,
   lastSync: null,
@@ -230,25 +229,25 @@ let cloudSync = {
   lastPushTime: 0,
   throttleMs: 5000,
 };
-function initCloudBase() {
+async function apiPost(path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authStore.a.token) headers['Authorization'] = 'Bearer ' + authStore.a.token;
+  const res = await fetch(API_BASE + path, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body || {}),
+  });
+  let data = null;
   try {
-    if (location.protocol === 'file:') {
-      // file:// 打开时 origin 为 null，CloudBase 安全域名机制无法覆盖，云功能整体不可用；本地功能不受影响
-      console.info('[cloud] file:// 模式，跳过云初始化');
-      return;
-    }
-    if (!window.cloudbase) {
-      console.warn('CloudBase SDK 未加载');
-      return;
-    }
-    // 密码登录与数据库 CRUD 实测仅需 env + region（accessKey/Publishable Key 非必需）
-    cloudApp = cloudbase.init({ env: CLOUD_ENV, region: CLOUD_REGION });
-    cloudDB = cloudApp.database();
-    initCloudAuth();
-    console.log('CloudBase 初始化成功');
-  } catch (e) {
-    console.warn('CloudBase 初始化失败:', e.message);
-  }
+    data = await res.json();
+  } catch (e) {}
+  return { status: res.status, data: data };
+}
+function handleSessionExpired() {
+  authStore.set({ status: 'anonymous', token: null, tokenExp: null });
+  cloudSync.enabled = false;
+  toast('登录状态已失效，请重新登录');
+  render();
 }
 function syncStatus() {
   if (!cloudSync.enabled) return { mode: 'off', text: '未开启同步' };
@@ -300,16 +299,23 @@ async function cloudSyncPush() {
   cloudSync.syncing = true;
   try {
     const state = store.exportState();
-    const uid = authStore.a.uid;
-    const doc = {
-      uid: uid,
+    const r = await apiPost('/sync/push', {
       data: state,
-      updatedAt: new Date().toISOString(),
-    };
-    await cloudDB.collection(COLLECTION).doc(uid).set(doc);
-    cloudSync.lastSync = new Date().toISOString();
-    authStore.set({ lastSyncAt: cloudSync.lastSync });
-    console.log('数据已同步到云端');
+      updatedAt: state.exportedAt,
+    });
+    if (r.status === 401) {
+      handleSessionExpired();
+      return;
+    }
+    if (r.status === 200 && r.data && r.data.ok) {
+      cloudSync.lastSync = r.data.updatedAt || new Date().toISOString();
+      authStore.set({ lastSyncAt: cloudSync.lastSync });
+      // 断网/多端期间以服务端字段级合并结果为准对齐本地（save 在 syncing 中不会再触发 push）
+      if (r.data.data && cloudMergeRemote({ data: r.data.data, updatedAt: r.data.updatedAt })) {
+        render();
+      }
+      console.log('数据已同步到云端');
+    }
   } catch (e) {
     console.warn('同步失败:', e.message);
   } finally {
@@ -321,25 +327,19 @@ async function cloudSyncPull() {
   if (!authStore.isAuthenticated()) return null;
   cloudSync.syncing = true;
   try {
-    const uid = authStore.a.uid;
-    const res = await cloudDB.collection(COLLECTION).doc(uid).get();
-    if (res.data && res.data.data) {
-      cloudSync.lastSync = new Date().toISOString();
-      authStore.set({ lastSyncAt: cloudSync.lastSync });
-      return res.data;
-    }
-    return null;
-  } catch (e) {
-    // 404 = 云端无数据，首次同步正常现象，静默处理
-    const code = e.code || e.errorCode || e.message || '';
-    if (
-      code.includes('404') ||
-      code.includes('document not found') ||
-      code.includes('文档不存在')
-    ) {
-      console.log('[cloud] 云端无数据，首次同步');
+    const r = await apiPost('/sync/pull', {});
+    if (r.status === 401) {
+      handleSessionExpired();
       return null;
     }
+    if (r.status === 200 && r.data && r.data.ok && r.data.data) {
+      cloudSync.lastSync = new Date().toISOString();
+      authStore.set({ lastSyncAt: cloudSync.lastSync });
+      return { data: r.data.data, updatedAt: r.data.updatedAt };
+    }
+    // 200 且 data:null = 云端无数据，首次同步正常现象
+    return null;
+  } catch (e) {
     console.warn('拉取失败:', e.message);
     return null;
   } finally {
@@ -378,10 +378,10 @@ const authStore = {
       status: 'anonymous',
       uid: null,
       nickname: null,
-      avatar: null,
+      token: null,
+      tokenExp: null,
       loginAt: null,
       lastSyncAt: null,
-      open_id: null,
     };
   },
   get a() {
@@ -414,118 +414,76 @@ const authStore = {
     this.save();
   },
   isAuthenticated() {
-    return this._a && this._a.status === 'authenticated';
+    return !!(this._a && this._a.status === 'authenticated' && this._a.token);
   },
 };
-let cloudAuth = null;
-function initCloudAuth() {
-  try {
-    if (!cloudApp) return;
-    cloudAuth = cloudApp.auth; // v3：auth 是实例属性，不是函数调用
-  } catch (e) {
-    console.warn('CloudBase Auth 初始化失败:', e.message);
-  }
-}
-function authErrText(err) {
-  const map = {
-    invalid_username_or_password: '用户名或密码不正确',
-    invalid_password: '用户名或密码不正确',
-    not_found: '账号不存在',
-    already_exists: '该用户名已被注册',
-    password_too_weak: '密码强度不足',
-    unauthenticated: '登录状态已失效，请重新登录',
-    permission_denied: '当前域名未获授权',
-    resource_exhausted: '操作过于频繁，请稍后再试',
-    captcha_required: '需要人机验证，请稍后再试',
-    missing_required_param: '请完整填写用户名和密码',
-    invalid_argument: '参数格式错误',
-    unreachable: '网络异常，请检查网络后重试',
-  };
-  const code = err && (err.code || err.errorCode);
-  return map[code] || (err && err.message) || '未知错误，请稍后再试';
+function tokenValid() {
+  const a = authStore.a;
+  return !!(a.token && (!a.tokenExp || new Date(a.tokenExp).getTime() > Date.now()));
 }
 async function checkAuth() {
-  if (!cloudAuth) return false;
-  try {
-    const res = await cloudAuth.getSession();
-    const session = res && res.data && res.data.session;
-    if (session && session.user) {
-      const u = session.user;
-      authStore.set({
-        status: 'authenticated',
-        uid: u.id || u.uid,
-        loginAt: authStore.a.loginAt || new Date().toISOString(),
-      });
-      return true;
-    }
-  } catch (e) {
-    console.warn('会话恢复异常:', e && e.message);
+  if (!CLOUD_ENABLED) return false;
+  const a = authStore.a;
+  if (a.status === 'authenticated' && tokenValid()) {
+    cloudSync.enabled = true;
+    return true;
   }
-  authStore.set({ status: 'anonymous' });
+  if (a.token && !tokenValid()) {
+    authStore.set({ status: 'anonymous', token: null, tokenExp: null });
+  }
   return false;
 }
 async function login(username, password) {
-  if (!cloudAuth) {
-    toast('登录服务未就绪（file:// 打开时云功能不可用）');
+  if (!CLOUD_ENABLED) {
+    toast('云同步需通过网站访问使用，本地功能不受影响');
     return false;
   }
   try {
-    const res = await cloudAuth.signInWithPassword({
-      username: username,
-      password: password,
+    const res = await fetch(API_BASE + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username, password: password }),
     });
-    if (res && res.error) {
-      console.warn('登录失败:', res.error.code, res.error.message);
-      toast('登录失败: ' + authErrText(res.error));
-      return false;
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {}
+    if (res.status === 200 && data && data.ok) {
+      authStore.set({
+        status: 'authenticated',
+        uid: data.uid,
+        nickname: data.username,
+        token: data.token,
+        tokenExp: data.expiresAt,
+        loginAt: new Date().toISOString(),
+      });
+      cloudSync.enabled = true;
+      toast('登录成功');
+      // 先拉取：命中则合并；云端无数据则以本地为准推送建号
+      const remote = await cloudSyncPull();
+      if (remote) {
+        if (cloudMergeRemote(remote)) {
+          render();
+          toast('已同步云端数据');
+        }
+      } else {
+        cloudSyncPush();
+      }
+      return true;
     }
-    const u = (res && res.data && res.data.user) || {};
-    const realUid = u.id || u.uid;
-    authStore.set({
-      status: 'authenticated',
-      uid: realUid,
-      nickname: username,
-      loginAt: new Date().toISOString(),
-    });
-    cloudSync.enabled = true;
-    await ensureUserDoc(realUid, username);
-    toast('登录成功');
-    return true;
+    if (res.status === 429) toast('尝试过于频繁，请稍后再试');
+    else toast((data && data.error && data.error.message) || '登录失败，请检查用户名和密码');
+    return false;
   } catch (e) {
-    console.error('登录失败:', e);
-    toast('登录失败: ' + ((e && e.message) || '请检查用户名和密码'));
+    toast('网络异常，请检查网络后重试');
     return false;
   }
 }
-async function logout() {
-  if (cloudAuth) {
-    try {
-      await cloudAuth.signOut();
-    } catch (e) {}
-  }
+function logout() {
   authStore.set(authStore.defaults());
   cloudSync.enabled = false;
   toast('已退出登录');
   render();
-}
-async function ensureUserDoc(uid, username) {
-  if (!cloudDB) return;
-  try {
-    const found = await cloudDB.collection('users').where({ uid: uid }).get();
-    if (found && found.data && found.data.length) return;
-    const userDoc = {
-      uid: uid,
-      username: username,
-      nickname: username,
-      avatar: null,
-      platform: 'web',
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-    };
-    await cloudDB.collection('users').add(userDoc);
-  } catch (e) {
-    console.warn('记录用户信息失败:', e && e.message);
-  }
 }
 async function bindOpenId() {
   toast('绑定功能将在小程序端上线后开放');
@@ -534,12 +492,8 @@ async function mergeAccounts() {
   toast('合并功能将在小程序端上线后开放');
 }
 function openLoginModal() {
-  if (location.protocol === 'file:') {
+  if (!CLOUD_ENABLED) {
     toast('云同步需通过网站访问使用，本地功能不受影响');
-    return;
-  }
-  if (!cloudAuth) {
-    toast('登录服务未就绪');
     return;
   }
   openModal({
@@ -2931,7 +2885,6 @@ function splitList(str, fallback) {
    10. 启动
    ================================================================== */
 (function init() {
-  initCloudBase();
   authStore.load();
   store.load();
   document.querySelectorAll('.side-foot .glyph').forEach(function (g) {
@@ -2945,7 +2898,7 @@ function splitList(str, fallback) {
     }, 900);
   }
   render();
-  // 刷新后用 v3 getSession 恢复登录态，恢复成功才开同步（cloudSync.enabled 是内存变量，重启必为 false）
+  // 用本地未过期 token 恢复登录态，有效才开同步并拉取（服务端仍逐请求验签兜底）
   checkAuth().then(function (authed) {
     if (!authed) return;
     cloudSync.enabled = true;
