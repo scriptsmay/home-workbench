@@ -46,22 +46,21 @@ echo "目标：$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH"
 
 echo "== 2/3 同步文件 =="
 # tar over ssh：不依赖 rsync（构建镜像不一定带），tar 与 ssh 是基线工具。
+# 只打包 frontend/：cloud/（云函数源码）、docs/ 等仓库内部资产不进公网静态目录。
+# 注意 tar 增量覆盖不会删除远端旧文件——目录扁平化改造后，webroot 里遗留的
+# 旧版 cloud/ docs/ 副本需到主机上一次性人工清理。
 # COPYFILE_DISABLE 与 --exclude=._* 是给「macOS 本地空跑」用的：
 # macOS 的 tar 会产出 AppleDouble 冗余文件（._xxx）与 xattr 头，Linux 构建机上无此问题，
 # 一并屏蔽可让本地预览与 CI 行为完全一致，也避免把冗余文件推到服务器。
 export COPYFILE_DISABLE=1
 tar czf - \
-  --exclude=.git \
-  --exclude=.cnb.yml \
-  --exclude=.gitignore \
-  --exclude=deploy \
   --exclude=._* \
-  -C . . \
+  -C frontend . \
   | ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" \
       "mkdir -p '$DEPLOY_PATH' && tar xzf - -C '$DEPLOY_PATH'"
 
 echo "== 3/3 校验 =="
-LOCAL_SIZE=$(wc -c < index.html | tr -d ' ')
+LOCAL_SIZE=$(wc -c < frontend/index.html | tr -d ' ')
 REMOTE_SIZE=$(ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" \
   "wc -c < '$DEPLOY_PATH/index.html'" | tr -d ' ')
 echo "本地 index.html：$LOCAL_SIZE 字节"
