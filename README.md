@@ -20,20 +20,26 @@ HTTP 端点（`API_BASE`），不接入任何厂商 SDK。
 
 ## 部署
 
-同一份源码，两条静态托管通道 + 一个同步后端：
+同一份源码（`frontend/`）由**两个推送目标**分发到三条静态通道，外加一个同步后端：
 
-- **国内节点（主）**：`.cnb.yml` 在 `main` 分支推送时把 `frontend/` 同步到目标主机，
+- **国内节点（主）** —— 触发方式 `git push origin main`（CNB）：
+  `.cnb.yml` 调用 `deploy/sync.sh`，把 `frontend/` 以 tar over ssh 同步到目标主机，
   由该机 Caddy `file_server` 托管。主机地址、登录用户、目标目录、SSH 私钥全部来自
   CNB **密钥仓库**，通过流水线 `imports` 注入 —— **本仓库不硬编码任何主机信息**。
-- **海外镜像（备）**：GitHub 仓库 → Cloudflare Pages 项目 `home-workbench`
-  （域名 `home-workbench.pages.dev` 与自定义域），**已绑定 Git 集成**：
-  推送 `main` 即自动构建部署（Production branch `main`、无构建命令、
-  Output directory = `frontend`）。排障或需要脱离 Git 手动发布时：
+- **Cloudflare Pages（海外）** —— 触发方式 `git push github main`：
+  Pages 项目 `home-workbench` 已绑定 GitHub Git 集成（Production branch `main`、无构建
+  命令、Output directory = `frontend`），域名 `home-workbench.pages.dev` 与自定义域。
+  排障或需要脱离 Git 手动发布时：
   `wrangler pages deploy frontend --project-name home-workbench`。
+- **Vercel（海外）** —— 同样由 `git push github main` 触发：项目 `home-workbench` 经
+  `vercel git connect` 关联 GitHub 仓，推送即自动构建（Root Directory `.`、
+  Output Directory `frontend`），生产别名 `home-workbench.vercel.app`。
+  手动发布：`vercel --prod`。
 - **同步后端**：CloudBase 云函数 `hwSyncApi`（独立于静态托管，见「云端环境」）。
 
-> 历史勘误：本版曾长期在文档里写作「GitHub 接入 Vercel，推送即部署」，与实际不符
-> （实际镜像一直是 Cloudflare Pages Direct Upload），Vercel 从未参与线上发布。
+> 注意：`origin`（CNB）与 `github`（镜像）是两个独立远端，**两次推送才能让三条通道全部
+> 生效**；且 Pages 在 2026-09-20 之前是直传式（无 Git 集成），推镜像不会触发它重建。
+
 
 ## 本地预览
 
