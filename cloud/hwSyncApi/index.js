@@ -108,6 +108,11 @@ function verifyToken(token) {
 }
 
 /* ---------- field-level merge (等价 v0.3 mergeData) ---------- */
+function businessEmpty(st) {
+  if (!st || typeof st !== 'object') return true;
+  const n = (k) => (Array.isArray(st[k]) ? st[k].length : 0);
+  return !n('items') && !n('wants') && !n('logs');
+}
 function mergeFields(base, incoming) {
   const result = JSON.parse(JSON.stringify(base));
   // 客户端时钟向前偏移会让其时间戳永远胜出（覆盖事故的放大器之一），
@@ -242,6 +247,18 @@ async function handlePush(event) {
   const incomingUpdatedAt = body.updatedAt || new Date().toISOString();
   const res = await getDb().collection(ITEMS).doc(a.uid).get().catch(() => null);
   const existing = res && res.data && res.data[0];
+  /* 清空式覆盖护栏（2026-09-21 二次事故后追加）：客户端本地为空（新设备、
+   * 或本地已被污染）时会推来一张空的业务表。若云端此刻仍有数据，这种推送
+   * 一律**不落库**，直接原样返回云端数据——云端数据一旦被空推送覆盖就是
+   * 不可逆的。代价：无法从空设备"清空云端"，需人工处理。 */
+  if (existing && existing.data && businessEmpty(body.data) && !businessEmpty(existing.data)) {
+    return json(200, {
+      ok: true,
+      data: existing.data,
+      updatedAt: existing.updatedAt || null,
+      strippedEmptyPush: true,
+    }, o);
+  }
   let merged = body.data;
   if (existing && existing.data) {
     merged = mergeFields(existing.data, body.data);
