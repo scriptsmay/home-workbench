@@ -50,3 +50,17 @@ cd frontend && python3 -m http.server 8080
 
 - 依赖 `localStorage`（Safari 无痕模式下不可用，普通模式正常）
 - 前端零 CDN、零第三方脚本依赖，离线可用（云同步除外）
+
+## v0.5 账号合并（Web ↔ 微信小程序）
+
+- **入口**：站点「我的」→「微信小程序」卡片（生成 6 位绑定码 / 已关联身份列表 / 解绑）。
+- **冲突解决**：绑定发现真冲突时弹出「合并数据」表单；**只列真冲突**，并集默认全选，可「全部保留并集（按较新）」一键兜底。
+- **本地预览**：cd frontend && python -m http.server 8080（ile:// 下云功能自动关闭，纯本地可用）。
+- **改动位置**：
+  - 文案与错误码映射：rontend/app.js 的 BIND_ERR_TEXT、wechatCardHtml()、enderMergeBody()
+  - 接口地址：rontend/app.js 顶部 API_BASE
+  - 颜色 / 圆角 / 阴影：只改 rontend/style.css 的 :root 语义 token（新界面零新增色值）
+  - 契约与端点：docs/v0.5-api-design.md
+- **服务端**：cloud/hwSyncApi/index.js（HTTP + callFunction 双入口）；测试 
+ode cloud/hwSyncApi/test/*.test.js（共 59 项）。
+- **发布顺序**：建集合 → 部署云函数 → 跑 cloud/scripts/migrate-home-items-ids.js → 前端上线 → 小程序发版（须晚于服务端）。
