@@ -69,7 +69,10 @@ const MODULES = [
    ================================================================== */
 const DEFAULTS = {
   schemaVersion: 1,
-  updatedAt: null,
+  // 必须是 '' 而非 null：load() / importState() 的字段合并按 typeof 分派，
+  // 而 typeof null === 'object'，会让字符串型 updatedAt 永远写不回来，
+  // 导致设备读回后时间戳恒为 null、云端更新无法下发（2026-09-21 修复）。
+  updatedAt: '',
   tab: 'today',
   shopName: '暖心小屋',
   tagline: '细水长流，岁岁年年',
