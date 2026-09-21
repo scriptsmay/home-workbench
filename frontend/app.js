@@ -579,11 +579,264 @@ function logout() {
   toast('已退出登录');
   render();
 }
-async function bindOpenId() {
-  toast('绑定功能将在小程序端上线后开放');
+/* ==================================================================
+   3.3 账号合并（v0.5）：身份绑定 / 绑定码 / 冲突解决
+   ------------------------------------------------------------------
+   契约：docs/v0.5-api-design.md。要点：
+   - Web 侧走 /api/bind/*（Bearer）；冲突 diff 里 left = 网页账号侧、right = 小程序侧；
+   - 提交只回传「选择」，不信任客户端数据；合并结果以服务端返回为准。
+   ================================================================== */
+const BIND_ERR_TEXT = {
+  rate_limited: '操作太频繁，请稍后再试',
+  identity_taken: '该微信已绑定到其它账号，请先解绑',
+  identity_required: '身份不存在或不属于当前账号',
+  merge_ticket_invalid: '合并信息已过期，请重新发起',
+  unauthorized: '登录状态已失效，请重新登录',
+};
+function bindErrText(r, fallback) {
+  const e = r && r.data && r.data.error;
+  return (e && BIND_ERR_TEXT[e.code]) || (e && e.message) || fallback || '操作失败，请稍后再试';
 }
-async function mergeAccounts() {
-  toast('合并功能将在小程序端上线后开放');
+const bindState = { code: '', expiresAt: null, timer: null, identities: [], loaded: false };
+let mergeCtx = null;
+
+function stopBindTimer() {
+  if (bindState.timer) { clearInterval(bindState.timer); bindState.timer = null; }
+}
+function bindRemainText() {
+  if (!bindState.expiresAt) return '';
+  const ms = new Date(bindState.expiresAt).getTime() - Date.now();
+  if (ms <= 0) return '';
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function startBindTimer() {
+  stopBindTimer();
+  bindState.timer = setInterval(function () {
+    if (!bindRemainText()) { stopBindTimer(); }
+    if (S().tab === 'my') render();
+  }, 1000);
+}
+async function refreshBind() {
+  if (!CLOUD_ENABLED || !authStore.isAuthenticated()) return;
+  const r = await apiPost('/bind/identities', {});
+  if (r.status === 200 && r.data && r.data.ok) {
+    bindState.identities = r.data.identities || [];
+    bindState.loaded = true;
+    if (S().tab === 'my') render();
+  }
+}
+async function genBindCode() {
+  if (!authStore.isAuthenticated()) { toast('请先登录'); return; }
+  toast('生成中…');
+  const r = await apiPost('/bind/code', {});
+  if (r.status === 200 && r.data && r.data.ok) {
+    bindState.code = r.data.code;
+    bindState.expiresAt = r.data.expiresAt;
+    startBindTimer();
+    render();
+    toast('绑定码已生成，5 分钟内有效');
+    return;
+  }
+  toast(bindErrText(r, '生成失败，请稍后再试'));
+}
+function revokeIdentity(identityId) {
+  openModal({
+    title: '确认解绑？',
+    sub: '解绑后，小程序端将回到未登录的临时身份。',
+    body:
+      '<div class="hint" style="background:var(--s-danger-bg);color:var(--s-danger-ink);border:2px solid var(--s-danger-line);border-radius:var(--r-ctl);padding:12px 14px;margin-bottom:12px">' +
+      '<div>· 小程序将不再看到这个账号的数据；</div>' +
+      '<div>· 云端数据仍保留在你的账号下，不会删除；</div>' +
+      '<div>· 重新登录或再次绑定即可恢复。</div>' +
+      '</div>' +
+      '<form id="modalForm"></form>',
+    submitText: '确认解绑',
+    onSubmit: async function () {
+      const r = await apiPost('/bind/revoke', { identityId: identityId });
+      if (r.status === 200 && r.data && r.data.ok) {
+        closeModal();
+        toast('已解绑');
+        await refreshBind();
+        if (S().tab === 'my') render();
+      } else {
+        toast(bindErrText(r, '解绑失败，请稍后再试'));
+      }
+    },
+  });
+}
+
+/* ---------- 冲突解决（核心 · D5） ---------- */
+const COLL_LABEL = { items: '库存', wants: '需求', logs: '流水' };
+const FIELD_LABEL = { shopName: '小屋名字', tagline: '名字下面那句话', freshDays: '临期提醒天数', soonDays: '关注范围天数' };
+function shortTimeText(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const p = (n) => (n < 10 ? '0' + n : '' + n);
+  return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function conflictValueText(c, side) {
+  const v = c[side] && c[side].value;
+  if (c.kind === 'scalar') return (v == null || v === '') ? '（空）' : String(v);
+  if (!v || typeof v !== 'object') return '（空）';
+  const parts = [];
+  if (v.name) parts.push(v.name);
+  if (v.qty != null) parts.push('×' + v.qty + (v.unit || ''));
+  else if (v.level) parts.push(v.level);
+  if (v.urgent) parts.push(v.urgent);
+  if (v.note) parts.push(v.note);
+  return parts.join(' · ') || '（空）';
+}
+function renderMergeBody() {
+  const ctx = mergeCtx;
+  if (!ctx) return '';
+  const conflicts = ctx.conflicts || [];
+  const s = ctx.summary || {};
+  let h = '';
+  h += '<div class="tiles">' +
+    '<div class="tile"><div class="tk">小程序侧</div><div class="tv">' + (s.rightOnly || 0) + '</div><div class="cap">条独有记录</div></div>' +
+    '<div class="tile"><div class="tk">网页侧</div><div class="tv">' + (s.leftOnly || 0) + '</div><div class="cap">条独有记录</div></div>' +
+    '<div class="tile warn"><div class="tk">真冲突</div><div class="tv">' + (s.conflicts != null ? s.conflicts : conflicts.length) + '</div><div class="cap">需要你决定</div></div>' +
+    '</div>';
+  h += '<div class="hint">不冲突的记录已自动并入（小程序独有 ' + (s.rightOnly || 0) + ' 条 · 网页独有 ' + (s.leftOnly || 0) + ' 条），不会丢。</div>';
+  h += '<form id="modalForm">';
+  for (let i = 0; i < conflicts.length; i++) {
+    const c = conflicts[i];
+    const title = c.kind === 'entry' ? (c.name || '这条记录') : (FIELD_LABEL[c.field] || c.field);
+    h += '<div class="card" style="margin-top:12px">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+      '<strong>' + esc(title) + '</strong>' +
+      '<span class="badge b-warn">真冲突 · ' + esc(c.kind === 'entry' ? (COLL_LABEL[c.collection] || c.collection) : '小屋信息') + '</span>' +
+      '</div>';
+    h += '<div class="stat-line"><span class="k">网页侧 ' + esc(shortTimeText(c.left && c.left.updatedAt)) + '</span><span class="v">' +
+      esc(conflictValueText(c, 'left')) + (c.defaultSide === 'left' ? ' <span class="badge b-ok">较新</span>' : '') + '</span></div>';
+    h += '<div class="stat-line"><span class="k">小程序侧 ' + esc(shortTimeText(c.right && c.right.updatedAt)) + '</span><span class="v">' +
+      esc(conflictValueText(c, 'right')) + (c.defaultSide === 'right' ? ' <span class="badge b-ok">较新</span>' : '') + '</span></div>';
+    h += '<div class="chips" style="margin-top:10px">' +
+      '<button type="button" class="chip ' + (c.side === 'left' ? 'on' : '') + '" data-mpick="' + esc(c.conflictId) + '" data-mside="left">保留网页侧</button>' +
+      '<button type="button" class="chip ' + (c.side === 'right' ? 'on' : '') + '" data-mpick="' + esc(c.conflictId) + '" data-mside="right">保留小程序侧</button>' +
+      '</div>';
+    if (c.fieldDiff && c.fieldDiff.length) {
+      h += '<div class="hint sm" style="margin-top:8px">';
+      for (let k = 0; k < c.fieldDiff.length; k++) {
+        const d = c.fieldDiff[k];
+        h += '<div>' + esc(d.field) + '：网页 ' + esc(d.left == null ? '—' : d.left) + ' ／ 小程序 ' + esc(d.right == null ? '—' : d.right) + '</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  h += '</form>';
+  h += '<div class="hint" style="margin-top:10px">不看也可以：默认按「较新」保留。冲突较多时可点左下「全部保留并集」。</div>';
+  return h;
+}
+async function openMergeResolver(identityId) {
+  toast('正在比对两端数据…');
+  const r = await apiPost('/bind/merge/pending', {});
+  if (r.status !== 200 || !r.data || !r.data.ok) { toast(bindErrText(r, '读不到合并信息')); return; }
+  const items = r.data.items || [];
+  const item = identityId
+    ? items.filter(function (x) { return x.identityId === identityId; })[0]
+    : items[0];
+  if (!item) { toast('当前没有待处理的合并'); await refreshBind(); return; }
+  const conflicts = (item.conflicts || []).map(function (c) {
+    return Object.assign({}, c, { side: c.defaultSide || 'left' });
+  });
+  if (!conflicts.length) {
+    const rr = await apiPost('/bind/merge/apply', { identityId: item.identityId, ticket: item.ticket, choices: [] });
+    if (rr.status === 200 && rr.data && rr.data.ok) { toast('已自动合并，无冲突'); await afterMerge(); }
+    else toast(bindErrText(rr, '合并失败，请稍后再试'));
+    return;
+  }
+  mergeCtx = { identityId: item.identityId, ticket: item.ticket, conflicts: conflicts, summary: item.summary || null };
+  openModal({
+    title: '合并数据',
+    sub: '两端的数据会合并成一份。下面只列出需要你决定的冲突，其余不冲突的记录都已自动保留。',
+    body: renderMergeBody(),
+    submitText: '确认合并（' + conflicts.length + '）',
+    extra: '<button type="button" class="btn" id="mergeUnionAll">全部保留并集（按较新）</button>',
+    onSubmit: function () { applyMerge(); },
+  });
+}
+async function applyMerge() {
+  if (!mergeCtx) return;
+  const choices = mergeCtx.conflicts.map(function (c) { return { conflictId: c.conflictId, side: c.side }; });
+  const r = await apiPost('/bind/merge/apply', { identityId: mergeCtx.identityId, ticket: mergeCtx.ticket, choices: choices });
+  if (r.status === 200 && r.data && r.data.ok) {
+    closeModal();
+    toast('已合并 ' + choices.length + ' 项');
+    await afterMerge();
+  } else {
+    toast(bindErrText(r, '合并失败，请重试'));
+  }
+}
+async function afterMerge() {
+  mergeCtx = null;
+  const remote = await cloudSyncPull();
+  if (remote.status === 'data') cloudMergeRemote(remote);
+  await refreshBind();
+  render();
+}
+function pickMergeSide(cid, side) {
+  if (!mergeCtx) return;
+  mergeCtx.conflicts = mergeCtx.conflicts.map(function (c) {
+    return c.conflictId === cid ? Object.assign({}, c, { side: side }) : c;
+  });
+  const body = el('modalBody');
+  if (body) body.innerHTML = renderMergeBody();
+}
+function mergeUnionAll() {
+  if (!mergeCtx) return;
+  mergeCtx.conflicts = mergeCtx.conflicts.map(function (c) {
+    return Object.assign({}, c, { side: c.defaultSide || 'left' });
+  });
+  const body = el('modalBody');
+  if (body) body.innerHTML = renderMergeBody();
+  applyMerge();
+}
+/* ---------- 「微信小程序」绑定卡片（W-1） ---------- */
+function wechatCardHtml() {
+  const ids = bindState.identities || [];
+  const bound = ids.length > 0;
+  const pending = ids.filter(function (x) { return x.mergePending; });
+  let h = '<div class="card">' +
+    '<h3><span class="h-l">' + icon('link', 18) + ' 微信小程序</span></h3>';
+  h += '<div class="stat-line"><span class="k">绑定状态</span><span class="v">' +
+    (bound ? '已关联 ' + ids.length + ' 个身份' : '未绑定') + '</span></div>';
+  if (pending.length) {
+    h += '<div class="hint" style="color:var(--s-warn-ink)">有 ' + pending.length + ' 个身份的数据待合并。</div>' +
+      '<div class="modal-foot" style="margin-top:10px"><button class="btn sm primary" id="mergeResolveBtn">处理合并</button></div>';
+  }
+  const alive = bindState.code && bindState.expiresAt && new Date(bindState.expiresAt).getTime() > Date.now();
+  if (alive) {
+    h += '<div style="margin-top:12px;padding:14px;border:2px solid var(--ink);border-radius:var(--r-ctl);box-shadow:var(--sh-btn);text-align:center">' +
+      '<div style="letter-spacing:.28em;font-size:30px;font-family:var(--font-num);color:var(--c-coral)">' + esc(bindState.code) + '</div>' +
+      '</div>' +
+      '<div class="stat-line"><span class="k">有效期</span><span class="v">剩余 ' + esc(bindRemainText()) + '</span></div>' +
+      '<div class="hint sm">在小程序「我的 → 输入绑定码」里输入这 6 位数字；5 分钟内有效，只能使用一次。</div>' +
+      '<div class="modal-foot" style="margin-top:10px"><button class="btn sm" id="genBindCodeBtn">重新生成</button></div>';
+  } else if (bindState.code) {
+    h += '<div class="hint" style="color:var(--s-danger-ink)">绑定码已过期，请重新生成。</div>' +
+      '<div class="modal-foot" style="margin-top:10px"><button class="btn sm primary" id="genBindCodeBtn">重新生成</button></div>';
+  } else if (!bound) {
+    h += '<div class="hint sm">在小程序里用同一账号登录，或生成绑定码让小程序输入，即可让两端看到同一份数据。</div>' +
+      '<div class="modal-foot" style="margin-top:10px"><button class="btn sm primary" id="genBindCodeBtn">' + icon('link', 16) + ' 生成绑定码</button></div>';
+  } else {
+    h += '<div class="hint sm">已绑定小程序，数据自动同步。</div>';
+  }
+  if (ids.length) {
+    h += '<div class="divider" style="margin:12px 0"></div><div class="rows">';
+    for (let i = 0; i < ids.length; i++) {
+      const idn = ids[i];
+      h += '<div class="row"><div class="grow"><div class="n">微信 · ' + esc(idn.nickname || '小程序身份') + '</div>' +
+        '<div class="m">绑定于 ' + esc(idn.linkedAt ? fmtDateTime(idn.linkedAt) : '—') + (idn.mergePending ? ' · 待合并' : '') + '</div></div>' +
+        '<button class="btn sm" data-revoke="' + esc(idn.identityId) + '" style="color:var(--s-danger-ink)">解绑</button></div>';
+    }
+    h += '</div><div class="hint sm">解绑后小程序回到临时身份，云端数据仍属于你的账号，不会丢失。</div>';
+  }
+  h += '</div>';
+  return h;
 }
 function openLoginModal() {
   if (!CLOUD_ENABLED) {
@@ -604,6 +857,7 @@ function openLoginModal() {
       if (ok) {
         closeModal();
         render();
+        refreshBind();
       }
     },
   });
@@ -1632,21 +1886,7 @@ function viewMy() {
       ' 立即同步</button>' +
       '</div>' +
       '</div>';
-    h +=
-      '<div class="card">' +
-      '<h3><span class="h-l">' +
-      icon('link', 18) +
-      ' 跨端同步</span></h3>' +
-      '<div class="stat-line"><span class="k">小程序绑定</span><span class="v">' +
-      (a.open_id ? '已绑定' : '未绑定') +
-      '</span></div>' +
-      (a.open_id
-        ? '<div class="hint sm">已绑定小程序，数据自动同步</div>'
-        : '<div class="modal-foot" style="margin-top:10px"><button class="btn sm" id="bindOpenIdBtn">绑定小程序</button></div>') +
-      '<div class="divider" style="margin:10px 0"></div>' +
-      '<button class="btn sm" id="mergeAccountBtn">合并账号</button>' +
-      '<div class="hint sm" style="margin-top:6px">若同一用户在两端有独立账号，可合并数据</div>' +
-      '</div>';
+    h += wechatCardHtml();
     h +=
       '<div class="card">' +
       '<h3><span class="h-l">' +
@@ -1896,6 +2136,7 @@ function goto(tab) {
   store.save();
   if (tab !== lastTab) el('viewEl').scrollTop = 0;
   render();
+  if (tab === 'my') refreshBind();
 }
 /* ==================================================================
    7. 弹层
@@ -2817,14 +3058,13 @@ document.addEventListener('click', function (e) {
     syncNow();
     return;
   }
-  if (t.closest('#bindOpenIdBtn')) {
-    bindOpenId();
-    return;
-  }
-  if (t.closest('#mergeAccountBtn')) {
-    mergeAccounts();
-    return;
-  }
+  if (t.closest('#genBindCodeBtn')) { genBindCode(); return; }
+  const revokeBtn = t.closest('[data-revoke]');
+  if (revokeBtn) { revokeIdentity(revokeBtn.dataset.revoke); return; }
+  if (t.closest('#mergeResolveBtn')) { openMergeResolver(null); return; }
+  if (t.closest('#mergeUnionAll')) { mergeUnionAll(); return; }
+  const mpick = t.closest('[data-mpick]');
+  if (mpick) { pickMergeSide(mpick.dataset.mpick, mpick.dataset.mside); return; }
 });
 document.addEventListener('submit', async function (e) {
   e.preventDefault();
