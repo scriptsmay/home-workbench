@@ -52,9 +52,14 @@ echo "== 2/3 同步文件 =="
 # COPYFILE_DISABLE 与 --exclude=._* 是给「macOS 本地空跑」用的：
 # macOS 的 tar 会产出 AppleDouble 冗余文件（._xxx）与 xattr 头，Linux 构建机上无此问题，
 # 一并屏蔽可让本地预览与 CI 行为完全一致，也避免把冗余文件推到服务器。
+#
+# --exclude=_headers：该文件是给 Cloudflare Pages 读的缓存策略声明（Pages 原生支持），
+# 与本站无关——本机的缓存策略由 Caddyfile 的 header 指令负责。不排除的话它会被当成
+# 普通静态文件发布出去（webroot 里多一个无意义的 /_headers 可被访问）。
 export COPYFILE_DISABLE=1
 tar czf - \
   --exclude=._* \
+  --exclude=_headers \
   -C frontend . \
   | ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" \
       "mkdir -p '$DEPLOY_PATH' && tar xzf - -C '$DEPLOY_PATH'"
