@@ -404,6 +404,14 @@ function cloudMergeRemote(remoteDoc) {
     return false;
   const localState = store.exportState();
   const remoteData = remoteDoc.data;
+  /* 空云端不得「清空」有数据的本地（2026-09-21 事故善后期追加）：
+   * 事故后云端可能仍是空文档（或被人为清空），若不加这道闸，任何一台
+   * 存有数据的设备一登录就会被空云端覆盖——而那正是找回数据的最后机会。
+   * 代价：云端刻意清空不会自动下发到有数据的设备，需在本机清空并等待推送。 */
+  if (localBusinessEmpty(remoteData) && !localBusinessEmpty(localState)) {
+    console.log('云端业务数据为空、本地有数据：保留本地，不做覆盖');
+    return false;
+  }
   const remoteTime = new Date(
     remoteDoc.updatedAt || remoteData.updatedAt || remoteData.exportedAt || 0,
   ).getTime();
