@@ -15,6 +15,7 @@ const SUITES = [
   ['integration.test.js', '端到端集成（内存库驱动 exports.main）'],
   ['conformance.test.js', '跨仓契约一致性（两端 action / 端点）'],
   ['ui-wiring.test.js', 'UI 接线审计（监听有产出、事件有实现）'],
+  ['miniapp-flow.test.js', '小程序页面级端到端（wx 桩驱动真实页面代码）'],
 ];
 
 const rows = [];
