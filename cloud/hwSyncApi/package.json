@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "hw-sync-api",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "home-workbench Web 端登录与云同步 HTTP 云函数",
   "main": "index.js",
   "runtime": "Nodejs18.15",
@@ -8,3 +8,4 @@
     "@cloudbase/node-sdk": "^3.1.2"
   }
 }
+

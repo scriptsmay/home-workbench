@@ -675,6 +675,12 @@ async function linkIdentity(openid, targetUid, source) {
 
   let identity = existing;
   if (!identity) {
+    /* 显式指定确定性 _id 并用 set（幂等）：
+     * add() 在云端返回的字段名与本地桩不一致（_id / id 差异曾导致 doc(undefined) 报错），
+     * 用确定性主键可彻底避开该平台差异，也保证重复调用幂等。 */
+    const idenId = 'iden_' + openid;
+    /* 注意：doc().set() 的载荷不能带 _id（云端会报「不能更新_id的值」）。
+     * 目标主键由 doc(idenId) 指定，载荷里不再重复 _id。 */
     const doc = {
       identity: key,
       provider: WECHAT_PROVIDER,
@@ -688,8 +694,8 @@ async function linkIdentity(openid, targetUid, source) {
       linkedAt: nowIso,
       mergedAt: null,
     };
-    const added = await db.collection(IDENTITIES).add(doc);
-    identity = Object.assign({ _id: added && added._id ? added._id : null }, doc);
+    await db.collection(IDENTITIES).doc(idenId).set(doc);
+    identity = Object.assign({ _id: idenId }, doc);
   }
 
   // 临时身份没有数据 → 直接绑定成功，无需合并

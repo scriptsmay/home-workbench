@@ -21,7 +21,7 @@
  * 纯函数 `unionState` / `entryIdOf` / `stable` 已导出，可在无云环境下被单测覆盖。
  */
 
-const DRY_RUN = process.argv.includes('--dry-run');
+const ARGV_DRY = process.argv.includes('--dry-run');
 const COLLECTIONS = ['items', 'wants', 'logs'];
 const UNION_ARRAYS = ['members', 'cats', 'places'];
 
@@ -75,12 +75,13 @@ function unionState(left, right) {
   return merged;
 }
 
-async function main() {
+async function main(opts) {
+  const dry = opts && 'dryRun' in opts ? !!opts.dryRun : ARGV_DRY;
   const cloudbase = require('@cloudbase/node-sdk');
   const ENV = process.env.TCB_ENV || cloudbase.SYMBOL_CURRENT_ENV;
   const db = cloudbase.init({ env: ENV }).database();
 
-  console.log('[migrate] env =', ENV, '| dry-run =', DRY_RUN);
+  console.log('[migrate] env =', ENV, '| dry-run =', dry);
   const col = db.collection('home_items');
   const res = await col.limit(1000).get();
   const docs = (res && res.data) || [];
@@ -95,6 +96,7 @@ async function main() {
   }
 
   let touched = 0;
+  const details = [];
   for (const entry of byUid) {
     const uid = entry[0];
     const group = entry[1];
@@ -111,9 +113,10 @@ async function main() {
     }
     if (!data) continue;
     const updatedAt = new Date().toISOString();
-    console.log('[migrate] uid=' + uid + ' 归一 ' + legacy.length + ' 篇旧文档（' + mergedFromIds.join(', ') + '）→ _id=' + uid + (DRY_RUN ? '（dry-run，不落库）' : ''));
+    details.push({ uid: uid, legacyIds: mergedFromIds, merged: legacy.length });
+    console.log('[migrate] uid=' + uid + ' 归一 ' + legacy.length + ' 篇旧文档（' + mergedFromIds.join(', ') + '）→ _id=' + uid + (dry ? '（dry-run，不落库）' : ''));
 
-    if (!DRY_RUN) {
+    if (!dry) {
       const doc = {
         uid: uid,
         data: data,
@@ -124,19 +127,25 @@ async function main() {
       if (target) await col.doc(uid).set(doc);
       else await col.add(Object.assign({ _id: uid }, doc));
       for (const d of legacy) {
-        await col.doc(d._id).set(Object.assign({}, d, {
+        /* set 载荷不能带 _id（云端会报「不能更新_id的值」） */
+        const patch = Object.assign({}, d, {
           migratedFrom: d._id,
           migratedAt: updatedAt,
           migratedTo: uid,
-        }));
+        });
+        delete patch._id;
+        delete patch.uid; // 去掉 uid：避免旧版小程序 where({uid}) 读到重复文档
+        await col.doc(d._id).set(patch);
       }
     }
     touched += legacy.length;
   }
-  console.log('[migrate] 完成：共归一 ' + touched + ' 篇文档' + (DRY_RUN ? '（dry-run，未落库）' : ''));
+  const summary = { env: ENV, dryRun: dry, scanned: docs.length, normalized: touched, details: details };
+  console.log('[migrate] 完成：共归一 ' + touched + ' 篇文档' + (dry ? '（dry-run，未落库）' : ''));
+  return summary;
 }
 
-module.exports = { unionState, entryIdOf, stable };
+module.exports = { unionState, entryIdOf, stable, main };
 
 if (require.main === module) {
   main().catch((e) => {

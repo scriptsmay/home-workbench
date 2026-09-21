@@ -73,6 +73,7 @@ function docApi(name, id) {
       return { data: d ? [clone(d)] : [] };
     },
     async set(obj) {
+      if (obj && Object.prototype.hasOwnProperty.call(obj, '_id')) throw new Error('不能更新_id的值');
       const arr = colArr(name);
       const i = arr.findIndex((x) => x._id === id);
       const nd = Object.assign({}, clone(obj), { _id: id });
