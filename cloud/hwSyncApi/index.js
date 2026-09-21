@@ -706,10 +706,10 @@ async function linkIdentity(openid, targetUid, source) {
     return { ok: true, uid: targetUid, tempUid, mergeRequired: false, identityId: identity._id };
   }
 
-  // 两侧都有数据 → 建映射 + mergePending，产出冲突 diff 与票据
+  // 两侧都有数据 → 算并集与真冲突
   const leftTime = new Date((leftState && leftState.updatedAt) || 0).getTime();
   const rightTime = new Date((rightState && rightState.updatedAt) || 0).getTime();
-  const { merged, conflicts, summary } = bindMerge(
+  const { conflicts, summary } = bindMerge(
     (leftState && leftState.data) || {},
     rightState.data,
     { leftTime, rightTime },
@@ -723,15 +723,30 @@ async function linkIdentity(openid, targetUid, source) {
     tempUid,
   });
 
+  /* 无真冲突：并集是无损的，服务端直接应用，不必让用户白跑一趟合并页。
+   * （若此处只置 mergePending 而不落库，客户端又因 mergeRequired=false 不进合并页，
+   *   临时身份的数据将永远悬空——集成测试捕获到这个缺陷。） */
+  if (!conflicts.length) {
+    const applied = await applyMerge(identity, [], false);
+    return {
+      ok: true,
+      uid: targetUid,
+      tempUid,
+      identityId: identity._id,
+      mergeRequired: false,
+      merged: true,
+      summary: applied.summary,
+    };
+  }
+
   const { ticket } = issueMergeTicket(identity._id, targetUid, tempUid);
   return {
     ok: true,
     uid: targetUid,
     tempUid,
     identityId: identity._id,
-    mergeRequired: conflicts.length > 0,
-    // 无真冲突也要允许「直接应用并集」，故 conflicts 为空时 mergeRequired=false
-    ticket: conflicts.length > 0 ? ticket : ticket,
+    mergeRequired: true,
+    ticket,
     conflicts,
     summary,
     leftFp: bizFp((leftState && leftState.data) || {}),
@@ -964,7 +979,13 @@ async function handlePush(event) {
   }
   let merged = body.data;
   if (existing && existing.data) {
-    merged = mergeFields(existing.data, body.data);
+    /* 合并需要一个「可比较的 incoming 时间戳」。契约里 updatedAt 在请求顶层
+     * （{data, updatedAt}），而 mergeFields 读的是 incoming.updatedAt：若客户端
+     * 只给顶层而 data 里没有，合并判定会拿到 0 → 永远判 incoming 非新 → 推送
+     * 静默不生效。这里以顶层值补位（客户端已自带则优先用其自带值）。 */
+    const incomingData = Object.assign({}, body.data);
+    if (!incomingData.updatedAt && incomingUpdatedAt) incomingData.updatedAt = incomingUpdatedAt;
+    merged = mergeFields(existing.data, incomingData);
   }
   const storedUpdatedAt = new Date().toISOString();
   // 覆盖前留一深备份（prevData/prevUpdatedAt）：误覆盖可人工回滚，是硬拒收清空式
@@ -1164,6 +1185,7 @@ async function mpLoginPassword(openid, body) {
     username: user.username,
     bound: true,
     mergeRequired: !!linked.mergeRequired,
+    merged: !!linked.merged,
   };
   if (linked.mergeRequired) {
     out.ticket = linked.ticket;
@@ -1234,7 +1256,12 @@ async function mpPush(uid, body) {
     return { ok: true, data: existing.data, updatedAt: existing.updatedAt || null, strippedEmptyPush: true };
   }
   let merged = body.data;
-  if (existing && existing.data) merged = mergeFields(existing.data, body.data);
+  if (existing && existing.data) {
+    // 同 HTTP 侧：顶层 updatedAt 补位，避免客户端漏写 data.updatedAt 时静默不生效
+    const incomingData = Object.assign({}, body.data);
+    if (!incomingData.updatedAt && incomingUpdatedAt) incomingData.updatedAt = incomingUpdatedAt;
+    merged = mergeFields(existing.data, incomingData);
+  }
   const storedUpdatedAt = new Date().toISOString();
   const doc = itemsDoc(uid, merged, storedUpdatedAt, existing);
   await saveItemsDoc(uid, doc, existing);
@@ -1271,6 +1298,7 @@ async function dispatchMp(event) {
             uid: r.uid,
             bound: true,
             mergeRequired: !!r.mergeRequired,
+            merged: !!r.merged,
           };
           if (r.mergeRequired) {
             out.ticket = r.ticket;
