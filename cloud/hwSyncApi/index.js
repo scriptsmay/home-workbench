@@ -15,9 +15,12 @@ const cloudbase = require('@cloudbase/node-sdk');
 
 const USERS = 'home_users';
 const ITEMS = 'home_items';
+const PUSH_LOG = 'home_push_log';
 const TOKEN_TTL_SEC = 30 * 24 * 60 * 60; // 30 天
 const MAX_FAILED = 5;
 const LOCK_MS = 15 * 60 * 1000;
+/* 每个 uid 保留的「内容变化」快照条数上限（无变化的推送不占位，见 writePushLog） */
+const PUSH_LOG_KEEP = 50;
 
 const DEFAULT_ORIGINS = [
   'https://home.virola-eko.com',
@@ -138,6 +141,102 @@ function mergeFields(base, incoming) {
   return result;
 }
 
+/* ---------- 推送快照（取证留痕） ---------- */
+/* 背景：2026-09-21 覆盖事故中云端数据被清空，而服务端不记录任何请求体，
+ * 导致「谁在什么时候推了什么」完全无从倒查。现每次 push 落库前留一份快照，
+ * 但**只保留内容真正发生变化的那些**——纯重复同步不留痕，避免日志被噪音淹没。
+ *
+ * 「内容」只认业务字段：时间戳（updatedAt/exportedAt）、界面态（ui）等一律排除。
+ * 理由：设备每次交互都会刷时间戳、切筛选条件会改 ui，这些不是用户数据，
+ * 拿它们算指纹会让「无改动」判定永远失败，快照退化成流水账。
+ */
+const BIZ_KEYS = [
+  'schemaVersion', 'shopName', 'tagline', 'members', 'cats', 'places',
+  'freshDays', 'soonDays', 'items', 'wants', 'logs',
+];
+
+function bizOf(data) {
+  const out = {};
+  if (!data || typeof data !== 'object') return out;
+  for (const k of BIZ_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(data, k)) out[k] = data[k];
+  }
+  return out;
+}
+
+/* 键序无关的稳定序列化：指纹只反映内容，不受字段书写顺序影响 */
+function stable(v) {
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v === undefined ? null : v);
+}
+
+function bizFp(data) {
+  return crypto.createHash('sha1').update(stable(bizOf(data))).digest('hex');
+}
+
+function clientIp(event) {
+  const h = event.headers || {};
+  const raw = h['x-forwarded-for'] || h['X-Forwarded-For'] || h['x-real-ip'] || h['X-Real-Ip'];
+  if (raw) return String(raw).split(',')[0].trim().slice(0, 64);
+  return String((event.requestContext && event.requestContext.sourceIp) || '').slice(0, 64);
+}
+
+function clientUa(event) {
+  const h = event.headers || {};
+  return String(h['user-agent'] || h['User-Agent'] || '').slice(0, 200);
+}
+
+/* 写快照。判据：本次推来的业务内容指纹 !== 云端当前内容指纹才记一条。
+ * 即「推的东西与云端已有的一样」= 无意义同步，直接跳过（不写库）。
+ * 快照失败绝不能影响同步主流程，故整体 try/catch 吞掉。 */
+async function writePushLog(opt) {
+  try {
+    const db = getDb();
+    const res = await db
+      .collection(PUSH_LOG)
+      .where({ uid: opt.uid })
+      .orderBy('seq', 'desc')
+      .limit(1)
+      .get()
+      .catch(() => null);
+    const last = res && res.data && res.data[0];
+    /* 无变化判定（两个都要比，缺一即漏）：
+     *   last.fp === opt.fp      本次推来的内容与上一条记录推来的相同 → 重复推送
+     *   last.resultFp === opt.fp 本次推来的内容与云端当前内容相同     → 无效同步
+     * 只比后者会让「连续多次相同的空推送」每次都留一条（云端内容始终没变）。 */
+    if (last && (last.fp === opt.fp || last.resultFp === opt.fp)) return;
+    const seq = ((last && last.seq) || 0) + 1;
+    await db.collection(PUSH_LOG).add({
+      uid: opt.uid,
+      seq,
+      at: new Date().toISOString(),
+      fp: opt.fp, // 客户端推来的内容指纹
+      prevFp: last ? last.resultFp : null, // 推送前云端内容指纹
+      prevSeq: last ? last.seq : null,
+      resultFp: opt.resultFp, // 推送后云端内容指纹（被拦时 = prevFp）
+      stored: !!opt.stored,
+      stripped: !!opt.stripped,
+      clientUpdatedAt: opt.clientUpdatedAt || null, // 客户端声称的时间戳，查时钟偏移/伪造
+      biz: opt.biz, // 推来的业务数据原文（已剔除时间戳与 ui）
+      ip: clientIp(opt.event),
+      ua: clientUa(opt.event),
+    });
+    /* 只保留最近 PUSH_LOG_KEEP 条变化，超期快照自动淘汰，避免无限膨胀。
+     * 保留区间是 [seq-KEEP+1, seq]，故删除条件是 seq <= seq-KEEP */
+    if (seq > PUSH_LOG_KEEP) {
+      await db
+        .collection(PUSH_LOG)
+        .where({ uid: opt.uid, seq: cmd().lte(seq - PUSH_LOG_KEEP) })
+        .remove();
+    }
+  } catch (e) {
+    console.error('hwSyncApi pushLog failed:', e && e.message);
+  }
+}
+
 /* ---------- helpers ---------- */
 function json(status, obj, origin) {
   return {
@@ -245,6 +344,8 @@ async function handlePush(event) {
     return json(400, err(400, 'bad_request', '缺少同步数据'), o);
   }
   const incomingUpdatedAt = body.updatedAt || new Date().toISOString();
+  const incomingBiz = bizOf(body.data);
+  const incomingFp = bizFp(body.data);
   const res = await getDb().collection(ITEMS).doc(a.uid).get().catch(() => null);
   const existing = res && res.data && res.data[0];
   /* 清空式覆盖护栏（2026-09-21 二次事故后追加）：客户端本地为空（新设备、
@@ -252,6 +353,17 @@ async function handlePush(event) {
    * 一律**不落库**，直接原样返回云端数据——云端数据一旦被空推送覆盖就是
    * 不可逆的。代价：无法从空设备"清空云端"，需人工处理。 */
   if (existing && existing.data && businessEmpty(body.data) && !businessEmpty(existing.data)) {
+    /* 取证：这次推送被拦下，但「试图清空云端」本身就是必须留痕的事件 */
+    await writePushLog({
+      uid: a.uid,
+      fp: incomingFp,
+      biz: incomingBiz,
+      resultFp: bizFp(existing.data),
+      stored: false,
+      stripped: true,
+      clientUpdatedAt: incomingUpdatedAt,
+      event,
+    });
     return json(200, {
       ok: true,
       data: existing.data,
@@ -278,6 +390,17 @@ async function handlePush(event) {
   } else {
     await getDb().collection(ITEMS).add(Object.assign({ _id: a.uid }, doc));
   }
+  /* 取证快照：只记内容真正变化的推送（resultFp 取自落库结果，尊重服务端合并） */
+  await writePushLog({
+    uid: a.uid,
+    fp: incomingFp,
+    biz: incomingBiz,
+    resultFp: bizFp(merged),
+    stored: true,
+    stripped: false,
+    clientUpdatedAt: incomingUpdatedAt,
+    event,
+  });
   return json(200, { ok: true, data: merged, updatedAt: storedUpdatedAt }, o);
 }
 
