@@ -110,8 +110,17 @@ function verifyToken(token) {
 /* ---------- field-level merge (等价 v0.3 mergeData) ---------- */
 function mergeFields(base, incoming) {
   const result = JSON.parse(JSON.stringify(base));
-  const baseTime = new Date(base.updatedAt || base.exportedAt || 0).getTime();
-  const inTime = new Date(incoming.updatedAt || incoming.exportedAt || 0).getTime();
+  // 客户端时钟向前偏移会让其时间戳永远胜出（覆盖事故的放大器之一），
+  // 双侧时间均钳制到服务器当前时间：晚于 now 的时间戳不给予胜出权
+  const nowMs = Date.now();
+  const baseTime = Math.min(
+    new Date(base.updatedAt || base.exportedAt || 0).getTime() || 0,
+    nowMs,
+  );
+  const inTime = Math.min(
+    new Date(incoming.updatedAt || incoming.exportedAt || 0).getTime() || 0,
+    nowMs,
+  );
   const useIncoming = inTime >= baseTime;
   for (const key in incoming) {
     if (!Object.prototype.hasOwnProperty.call(incoming, key)) continue;
@@ -238,7 +247,15 @@ async function handlePush(event) {
     merged = mergeFields(existing.data, body.data);
   }
   const storedUpdatedAt = new Date().toISOString();
-  const doc = { uid: a.uid, data: merged, updatedAt: storedUpdatedAt };
+  // 覆盖前留一深备份（prevData/prevUpdatedAt）：误覆盖可人工回滚，是硬拒收清空式
+  // 推送的替代方案——硬拒会误杀「设置页刻意清空」的合法操作，备份保可回滚性
+  const doc = {
+    uid: a.uid,
+    data: merged,
+    updatedAt: storedUpdatedAt,
+    prevData: existing && existing.data ? existing.data : null,
+    prevUpdatedAt: existing && existing.updatedAt ? existing.updatedAt : null,
+  };
   if (existing) {
     await getDb().collection(ITEMS).doc(a.uid).set(doc);
   } else {

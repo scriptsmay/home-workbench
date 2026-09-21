@@ -69,6 +69,7 @@ const MODULES = [
    ================================================================== */
 const DEFAULTS = {
   schemaVersion: 1,
+  updatedAt: null,
   tab: 'today',
   shopName: '暖心小屋',
   tagline: '细水长流，岁岁年年',
@@ -129,6 +130,8 @@ const store = {
     return base;
   },
   save() {
+    // 真实修改时间：合并方向判定的唯一依据（2026-09-21 覆盖事故根因修复）
+    this._s.updatedAt = new Date().toISOString();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this._s));
     } catch (e) {
@@ -193,9 +196,10 @@ const store = {
   },
   /* 备份 */
   exportState() {
-    const c = JSON.parse(JSON.stringify(this.s));
-    c.exportedAt = new Date().toISOString();
-    return c;
+    // 不再注入 exportedAt：它曾被当作「本地修改时间」参与合并比较，恒等于 now，
+    // 导致本地数据永远被判为最新（2026-09-21 匿名数据覆盖云端事故根因）。
+    // JSON 备份的导出戳由 csv.exportJSON() 自行补充。
+    return JSON.parse(JSON.stringify(this.s));
   },
   importState(data) {
     const base = this.defaults();
@@ -224,6 +228,7 @@ let cloudSync = {
   enabled: false,
   lastSync: null,
   syncing: false,
+  mergeLock: false,
   pending: 0,
   queueTimer: null,
   lastPushTime: 0,
@@ -257,7 +262,7 @@ function syncStatus() {
   if (cloudSync.lastSync) return { mode: 'synced', text: '已同步' };
   return { mode: 'idle', text: '等待同步' };
 }
-function mergeData(local, remote) {
+function mergeData(local, remote, localWins) {
   const result = JSON.parse(JSON.stringify(local));
   const localTime = new Date(
     local.updatedAt || local.exportedAt || 0,
@@ -265,7 +270,8 @@ function mergeData(local, remote) {
   const remoteTime = new Date(
     remote.updatedAt || remote.exportedAt || 0,
   ).getTime();
-  const useRemote = remoteTime >= localTime;
+  // localWins=true：本地权威（遗留无时间戳数据），只允许远端补空键，不覆盖
+  const useRemote = !localWins && remoteTime >= localTime;
   for (const key in remote) {
     if (!Object.prototype.hasOwnProperty.call(remote, key)) continue;
     const localVal = local[key];
@@ -281,7 +287,7 @@ function mergeData(local, remote) {
   return result;
 }
 async function cloudSyncPush() {
-  if (!cloudSync.enabled || cloudSync.syncing) return;
+  if (!cloudSync.enabled || cloudSync.syncing || cloudSync.mergeLock) return;
   if (!authStore.isAuthenticated()) return;
   const now = Date.now();
   if (now - cloudSync.lastPushTime < cloudSync.throttleMs) {
@@ -301,7 +307,7 @@ async function cloudSyncPush() {
     const state = store.exportState();
     const r = await apiPost('/sync/push', {
       data: state,
-      updatedAt: state.exportedAt,
+      updatedAt: state.updatedAt || new Date().toISOString(),
     });
     if (r.status === 401) {
       handleSessionExpired();
@@ -322,46 +328,113 @@ async function cloudSyncPush() {
     cloudSync.syncing = false;
   }
 }
+/* 拉取结果三态（含忙碌/未登录哨兵）：
+ *   'data'  云端有数据（含 data/updatedAt）
+ *   'empty' 云端无数据（首次建号场景）
+ *   'error' 网络或服务异常——云端状态未知，调用方禁止据此推送本地
+ *   'busy'  已有同步在途
+ * 不依赖 cloudSync.enabled：登录/会话恢复流程需在开同步之前先拉取。 */
 async function cloudSyncPull() {
-  if (!cloudSync.enabled || cloudSync.syncing) return null;
-  if (!authStore.isAuthenticated()) return null;
+  if (cloudSync.syncing) return { status: 'busy' };
+  if (!authStore.isAuthenticated()) return { status: 'off' };
   cloudSync.syncing = true;
   try {
     const r = await apiPost('/sync/pull', {});
     if (r.status === 401) {
       handleSessionExpired();
-      return null;
+      return { status: 'error' };
     }
-    if (r.status === 200 && r.data && r.data.ok && r.data.data) {
-      cloudSync.lastSync = new Date().toISOString();
-      authStore.set({ lastSyncAt: cloudSync.lastSync });
-      return { data: r.data.data, updatedAt: r.data.updatedAt };
+    if (r.status === 200 && r.data && r.data.ok) {
+      if (r.data.data) {
+        cloudSync.lastSync = new Date().toISOString();
+        authStore.set({ lastSyncAt: cloudSync.lastSync });
+        return {
+          status: 'data',
+          data: r.data.data,
+          updatedAt: r.data.updatedAt,
+        };
+      }
+      // 200 且 data:null = 云端无数据，首次同步正常现象
+      return { status: 'empty' };
     }
-    // 200 且 data:null = 云端无数据，首次同步正常现象
-    return null;
+    console.warn('拉取失败: HTTP ' + r.status);
+    return { status: 'error' };
   } catch (e) {
     console.warn('拉取失败:', e.message);
-    return null;
+    return { status: 'error' };
   } finally {
     cloudSync.syncing = false;
   }
 }
+/* 手动「立即同步」：拉取合并 → 推送本地，两端对齐 */
+async function syncNow() {
+  if (!authStore.isAuthenticated()) {
+    toast('请先登录');
+    return;
+  }
+  toast('同步中…');
+  const r = await cloudSyncPull();
+  if (r.status === 'error' || r.status === 'busy') {
+    toast('云端数据拉取失败，请稍后重试');
+    return;
+  }
+  if (r.status === 'data' && cloudMergeRemote(r)) render();
+  cloudSync.enabled = true;
+  cloudSyncPush();
+}
+function applyRemoteState(data) {
+  // 合并回写期间持锁：importState→save 不得再触发 push（防写回放大）
+  cloudSync.mergeLock = true;
+  try {
+    store.importState(data);
+  } finally {
+    cloudSync.mergeLock = false;
+  }
+}
+function localBusinessEmpty(st) {
+  return !st.items.length && !st.wants.length && !st.logs.length;
+}
 function cloudMergeRemote(remoteDoc) {
-  if (!remoteDoc || !remoteDoc.data) return false;
+  if (
+    !remoteDoc ||
+    remoteDoc.status === 'error' ||
+    remoteDoc.status === 'busy' ||
+    !remoteDoc.data
+  )
+    return false;
   const localState = store.exportState();
   const remoteData = remoteDoc.data;
   const remoteTime = new Date(
-    remoteDoc.updatedAt || remoteData.exportedAt || 0,
+    remoteDoc.updatedAt || remoteData.updatedAt || remoteData.exportedAt || 0,
   ).getTime();
-  const localTime = new Date(localState.exportedAt || 0).getTime();
+  /* 本地态三分支：
+   * 1) 处女态：无 updatedAt 且业务数组全空（新设备初始数据）→ 无条件全量采用云端；
+   * 2) 遗留态：无 updatedAt 但有数据（修复上线前的存量本地数据）→ 本地权威，
+   *    只补空键——防止被（可能已污染的）云端文档整包反噬，保住老设备好数据；
+   * 3) 新格式：真实时间戳比较，云端新则整包取云端，否则字段级合并。 */
+  if (!localState.updatedAt && localBusinessEmpty(localState)) {
+    applyRemoteState(remoteData);
+    console.log('新设备初始数据，已全量采用云端');
+    return true;
+  }
+  if (!localState.updatedAt) {
+    const merged = mergeData(localState, remoteData, true);
+    if (JSON.stringify(merged) !== JSON.stringify(localState)) {
+      applyRemoteState(merged);
+      console.log('遗留本地数据权威合并（只补空键）');
+      return true;
+    }
+    return false;
+  }
+  const localTime = new Date(localState.updatedAt).getTime();
   if (remoteTime > localTime) {
-    store.importState(remoteData);
+    applyRemoteState(remoteData);
     console.log('云端数据更新，已合并');
     return true;
   }
   const merged = mergeData(localState, remoteData);
   if (JSON.stringify(merged) !== JSON.stringify(localState)) {
-    store.importState(merged);
+    applyRemoteState(merged);
     console.log('数据已字段级合并');
     return true;
   }
@@ -425,7 +498,7 @@ async function checkAuth() {
   if (!CLOUD_ENABLED) return false;
   const a = authStore.a;
   if (a.status === 'authenticated' && tokenValid()) {
-    cloudSync.enabled = true;
+    // 只验会话有效性；enabled 延迟到 pull 合并完成后由调用方开启
     return true;
   }
   if (a.token && !tokenValid()) {
@@ -460,17 +533,22 @@ async function login(username, password) {
         tokenExp: data.expiresAt,
         loginAt: new Date().toISOString(),
       });
-      cloudSync.enabled = true;
       toast('登录成功');
-      // 先拉取：命中则合并；云端无数据则以本地为准推送建号
+      /* 先拉取合并，完成后才开自动同步（enabled 延迟开启，
+       * 关闭「登录竞态窗口内一次 save 即把本地态推上云端」的通道） */
       const remote = await cloudSyncPull();
-      if (remote) {
+      if (remote.status === 'data') {
         if (cloudMergeRemote(remote)) {
           render();
           toast('已同步云端数据');
         }
-      } else {
+        cloudSync.enabled = true;
+      } else if (remote.status === 'empty') {
+        cloudSync.enabled = true;
         cloudSyncPush();
+      } else {
+        // error / busy：云端状态未知，不开自动同步，避免盲推本地
+        toast('云端数据拉取失败，暂未开启自动同步；请稍后在「我的」里点「立即同步」');
       }
       return true;
     }
@@ -2488,9 +2566,11 @@ const csv = {
     toast('已导出全部 ' + all.length + ' 条');
   },
   exportJSON: function () {
+    const snap = store.exportState();
+    snap.exportedAt = new Date().toISOString();
     this.download(
       (S().shopName || '工作台') + '-备份-' + stampStr() + '.json',
-      JSON.stringify(store.exportState(), null, 2),
+      JSON.stringify(snap, null, 2),
       'application/json',
     );
     toast('备份已下载');
@@ -2723,8 +2803,7 @@ document.addEventListener('click', function (e) {
     return;
   }
   if (t.closest('#syncNowBtn')) {
-    cloudSyncPush();
-    toast('同步中…');
+    syncNow();
     return;
   }
   if (t.closest('#bindOpenIdBtn')) {
@@ -2925,15 +3004,17 @@ function splitList(str, fallback) {
     }, 900);
   }
   render();
-  // 用本地未过期 token 恢复登录态，有效才开同步并拉取（服务端仍逐请求验签兜底）
+  // 用本地未过期 token 恢复登录态（服务端仍逐请求验签兜底）；
+  // 先拉取合并，成功后才开自动同步，防处女态在竞态窗口内被推上云端
   checkAuth().then(function (authed) {
     if (!authed) return;
-    cloudSync.enabled = true;
-    cloudSyncPull().then(function (remoteDoc) {
-      if (cloudMergeRemote(remoteDoc)) {
+    cloudSyncPull().then(function (r) {
+      if (r.status === 'error' || r.status === 'busy') return;
+      if (r.status === 'data' && cloudMergeRemote(r)) {
         render();
         toast('已同步云端数据');
       }
+      cloudSync.enabled = true;
     });
   });
 })();
