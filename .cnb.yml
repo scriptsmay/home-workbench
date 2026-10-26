@@ -20,7 +20,7 @@ main:
   push:
     - name: deploy-static-site
       imports:
-        - https://cnb.cool/scriptsmay/deploy-secrets/-/blob/main/home-workbench.yml
+        - https://cnb.cool/scriptsmay/project-secrets/-/blob/main/home-workbench.yml
       stages:
         - name: deploy
           script: bash deploy/sync.sh
@@ -31,7 +31,7 @@ main:
   api_trigger:
     - name: deploy-static-site
       imports:
-        - https://cnb.cool/scriptsmay/deploy-secrets/-/blob/main/home-workbench.yml
+        - https://cnb.cool/scriptsmay/project-secrets/-/blob/main/home-workbench.yml
       stages:
         - name: deploy
           script: bash deploy/sync.sh
